@@ -51,6 +51,7 @@ export default function Client() {
     }
   };
 
+
   if (!connected) {
     return (
       <div className="flex flex-col justify-center items-center h-screen bg-gray-900 text-white">
@@ -61,12 +62,9 @@ export default function Client() {
   }
 
   // Draw From Other Mode
-  if (viewOther) {
-    const targetPlayer = gameState?.players[viewOther];
-    if (!targetPlayer) {
-      setViewOther(null);
-      return null;
-    }
+  const targetPlayer = viewOther && gameState ? gameState.players[viewOther] : null;
+
+  if (viewOther && targetPlayer) {
 
     return (
       <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
