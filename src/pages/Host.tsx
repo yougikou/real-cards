@@ -13,7 +13,7 @@ export default function Host() {
     return <div className="flex justify-center items-center h-screen">Initializing Host...</div>;
   }
 
-  const joinUrl = `${window.location.origin}/#/client/${peerId}`;
+  const joinUrl = `${window.location.origin}${window.location.pathname}#/client/${peerId}`;
 
   return (
     <div className="min-h-screen bg-green-800 p-4 text-white relative flex flex-col">
