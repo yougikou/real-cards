@@ -1,6 +1,31 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Unregister conflicting Service Workers from root scopes before they intercept requests -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          const currentScope = new URL('./', window.location.href).href;
+          for (let registration of registrations) {
+            const regScope = registration.scope;
+            // If the registered scope is a parent directory (e.g. root '/' when we are in '/real-cards/')
+            // and not our exact scope, unregister it.
+            if (currentScope.startsWith(regScope) && currentScope !== regScope) {
+              console.warn('Unregistering conflicting service worker from scope:', regScope);
+              registration.unregister().then(function() {
+                // Clear all caches just in case
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    for (let name of names) caches.delete(name);
+                  });
+                }
+                window.location.reload();
+              });
+            }
+          }
+        });
+      }
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="./icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
