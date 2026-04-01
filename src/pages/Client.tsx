@@ -22,6 +22,9 @@ export default function Client() {
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [viewOther, setViewOther] = useState<string | null>(null);
 
+  // Gesture state
+  const [touchStartY, setTouchStartY] = useState(0);
+
   const toggleSelect = (cardId: string) => {
     setSelectedCards(prev =>
       prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]
@@ -39,7 +42,7 @@ export default function Client() {
   const handleReturnSelected = () => {
     const cardsToReturn = hand.filter(c => selectedCards.includes(c.id));
     if (cardsToReturn.length > 0) {
-      returnCards(cardsToReturn, false); // Return to bottom for simplicity
+      returnCards(cardsToReturn, false);
       setSelectedCards([]);
     }
   };
@@ -48,6 +51,34 @@ export default function Client() {
     if (gameState && gameState.playStack.length > 0) {
       const topBatch = gameState.playStack[gameState.playStack.length - 1];
       takeBackCards(topBatch);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartY(e.touches[0].clientY);
+  };
+
+  const handleSwipeUpPlay = (e: React.TouchEvent) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    const dragY = touchEndY - touchStartY;
+
+    // Swiped UP
+    if (dragY < -50) {
+      handlePlaySelected();
+    }
+  };
+
+  const handleSwipeDownDrawReturn = (e: React.TouchEvent) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    const dragY = touchEndY - touchStartY;
+
+    // Swiped DOWN
+    if (dragY > 50) {
+      if (selectedCards.length > 0) {
+        handleReturnSelected();
+      } else {
+        drawCard(1);
+      }
     }
   };
 
@@ -106,57 +137,42 @@ export default function Client() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
-      {/* Top Actions Area */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => drawCard(1)}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 font-bold py-4 rounded-xl transition-colors active:scale-95"
-        >
-          DRAW (1)
-        </button>
-        <button
-          onClick={handleTakeBack}
-          disabled={!gameState || gameState.playStack.length === 0}
-          className={`flex-1 font-bold py-4 rounded-xl transition-colors active:scale-95 ${
-            !gameState || gameState.playStack.length === 0
-              ? 'bg-gray-700 text-gray-500'
-              : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-          }`}
-        >
-          TAKE BACK
-        </button>
+      {/* Top Play/Take Back Zone Indicator */}
+      <div
+        className="h-24 border-2 border-dashed border-gray-700 rounded-xl flex items-center justify-center mb-4 bg-gray-800/50 cursor-pointer"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleSwipeUpPlay}
+      >
+        <span className="text-gray-500 font-bold uppercase tracking-widest text-center pointer-events-none">
+          {selectedCards.length > 0 ? `↑ Swipe up to PLAY (${selectedCards.length})` : 'Play Zone (Select cards first)'}
+        </span>
       </div>
 
-      {/* Selected Action Area */}
-      <div className="flex gap-2 mb-6 h-16">
-        {selectedCards.length > 0 ? (
-          <>
-            <button
-              onClick={handlePlaySelected}
-              className="flex-1 bg-green-600 hover:bg-green-700 font-bold rounded-xl transition-colors active:scale-95 text-lg"
-            >
-              PLAY ({selectedCards.length})
-            </button>
-            <button
-              onClick={handleReturnSelected}
-              className="flex-1 bg-red-600 hover:bg-red-700 font-bold rounded-xl transition-colors active:scale-95"
-            >
-              RETURN
-            </button>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-700 rounded-xl text-gray-500 font-bold">
-            Select cards to play or return
-          </div>
-        )}
+      <div className="flex gap-2 mb-4 justify-end">
+         <button
+            onClick={handleTakeBack}
+            disabled={!gameState || gameState.playStack.length === 0}
+            className={`font-bold py-2 px-4 rounded-lg transition-colors active:scale-95 ${
+              !gameState || gameState.playStack.length === 0
+                ? 'bg-gray-700 text-gray-500'
+                : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+            }`}
+          >
+            TAKE BACK (Undo)
+          </button>
       </div>
 
       {/* Hand Area */}
       <div className="flex-grow flex flex-col">
-        <h2 className="text-lg font-bold mb-2 flex justify-between">
+        <h2 className="text-lg font-bold mb-2 flex justify-between items-center">
           <span>Your Hand ({hand.length})</span>
           {selectedCards.length > 0 && (
-            <button onClick={() => setSelectedCards([])} className="text-sm text-blue-400">Clear</button>
+            <button
+               onClick={() => setSelectedCards([])}
+               className="text-sm text-blue-400 bg-gray-800 px-3 py-1 rounded"
+            >
+               Clear Selection
+            </button>
           )}
         </h2>
 
@@ -195,10 +211,23 @@ export default function Client() {
           </div>
           {hand.length === 0 && (
             <div className="h-full flex items-center justify-center text-gray-500 mt-10">
-              No cards in hand. Draw some!
+              No cards in hand. Swipe down to draw!
             </div>
           )}
         </div>
+      </div>
+
+      {/* Bottom Draw/Return Zone Indicator */}
+      <div
+        className="mt-4 h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleSwipeDownDrawReturn}
+      >
+        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none">
+          ↓ Swipe down to
+          <br />
+          {selectedCards.length > 0 ? `RETURN (${selectedCards.length})` : 'DRAW (1)'}
+        </span>
       </div>
 
       {/* Other Players Area */}
