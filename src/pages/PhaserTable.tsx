@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 
 interface PlayerZone {
   rect: Phaser.GameObjects.Rectangle;
+  text?: Phaser.GameObjects.Text;
   zoneId: string;
 }
 
@@ -68,6 +69,37 @@ class TableScene extends Phaser.Scene {
     }
 
     this.setupInteractions();
+
+    this.scale.on('resize', this.handleResize, this);
+  }
+
+  private handleResize(gameSize: Phaser.Structs.Size) {
+    if (this.matter && this.matter.world) {
+        this.matter.world.setBounds(0, 0, gameSize.width, gameSize.height);
+    }
+
+    for (const zone of this.playerZones) {
+        if (this.matter && zone.rect.body) {
+            this.matter.world.remove(zone.rect.body as MatterJS.BodyType);
+        }
+        zone.rect.destroy();
+        if (zone.text) {
+            zone.text.destroy();
+        }
+    }
+    this.playerZones = [];
+
+    this.createPlayerZones();
+
+    const deckX = gameSize.width / 2;
+    const deckY = gameSize.height / 2;
+
+    for (let i = 0; i < this.deckSprites.length; i++) {
+        const card = this.deckSprites[i];
+        if (card.active) {
+            card.setPosition(deckX + i * 2, deckY - i * 2);
+        }
+    }
   }
 
   private createPlayerZones() {
@@ -76,21 +108,65 @@ class TableScene extends Phaser.Scene {
     const color = 0x00ff00;
     const alpha = 0.1;
 
-    const topZone = this.add.rectangle(width / 2, zoneThickness / 2, width, zoneThickness, color, alpha);
-    if (this.matter) this.matter.add.gameObject(topZone, { isStatic: true, isSensor: true });
-    this.playerZones.push({ rect: topZone as Phaser.GameObjects.Rectangle, zoneId: 'player_top' });
+    const isLandscape = width > height;
+    const topBottomCount = isLandscape ? 3 : 2;
+    const leftRightCount = isLandscape ? 2 : 3;
 
-    const bottomZone = this.add.rectangle(width / 2, height - zoneThickness / 2, width, zoneThickness, color, alpha);
-    if (this.matter) this.matter.add.gameObject(bottomZone, { isStatic: true, isSensor: true });
-    this.playerZones.push({ rect: bottomZone as Phaser.GameObjects.Rectangle, zoneId: 'player_bottom' });
+    // Top zones
+    const topWidth = width / topBottomCount;
+    for (let i = 0; i < topBottomCount; i++) {
+        const x = (i * topWidth) + (topWidth / 2);
+        const y = zoneThickness / 2;
+        const zone = this.add.rectangle(x, y, topWidth, zoneThickness, color, alpha);
+        zone.setStrokeStyle(2, 0xffffff, 0.5);
+        if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
-    const leftZone = this.add.rectangle(zoneThickness / 2, height / 2, zoneThickness, height - zoneThickness * 2, color, alpha);
-    if (this.matter) this.matter.add.gameObject(leftZone, { isStatic: true, isSensor: true });
-    this.playerZones.push({ rect: leftZone as Phaser.GameObjects.Rectangle, zoneId: 'player_left' });
+        const text = this.add.text(x, y, `Top Player ${i + 1}`, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5);
 
-    const rightZone = this.add.rectangle(width - zoneThickness / 2, height / 2, zoneThickness, height - zoneThickness * 2, color, alpha);
-    if (this.matter) this.matter.add.gameObject(rightZone, { isStatic: true, isSensor: true });
-    this.playerZones.push({ rect: rightZone as Phaser.GameObjects.Rectangle, zoneId: 'player_right' });
+        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_top_${i + 1}` });
+    }
+
+    // Bottom zones
+    const bottomWidth = width / topBottomCount;
+    for (let i = 0; i < topBottomCount; i++) {
+        const x = (i * bottomWidth) + (bottomWidth / 2);
+        const y = height - zoneThickness / 2;
+        const zone = this.add.rectangle(x, y, bottomWidth, zoneThickness, color, alpha);
+        zone.setStrokeStyle(2, 0xffffff, 0.5);
+        if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
+
+        const text = this.add.text(x, y, `Bottom Player ${i + 1}`, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5);
+
+        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_bottom_${i + 1}` });
+    }
+
+    // Left zones
+    const leftHeight = (height - (zoneThickness * 2)) / leftRightCount;
+    for (let i = 0; i < leftRightCount; i++) {
+        const x = zoneThickness / 2;
+        const y = zoneThickness + (i * leftHeight) + (leftHeight / 2);
+        const zone = this.add.rectangle(x, y, zoneThickness, leftHeight, color, alpha);
+        zone.setStrokeStyle(2, 0xffffff, 0.5);
+        if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
+
+        const text = this.add.text(x, y, `Left Player ${i + 1}`, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5).setRotation(Math.PI / 2);
+
+        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_left_${i + 1}` });
+    }
+
+    // Right zones
+    const rightHeight = (height - (zoneThickness * 2)) / leftRightCount;
+    for (let i = 0; i < leftRightCount; i++) {
+        const x = width - zoneThickness / 2;
+        const y = zoneThickness + (i * rightHeight) + (rightHeight / 2);
+        const zone = this.add.rectangle(x, y, zoneThickness, rightHeight, color, alpha);
+        zone.setStrokeStyle(2, 0xffffff, 0.5);
+        if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
+
+        const text = this.add.text(x, y, `Right Player ${i + 1}`, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5).setRotation(-Math.PI / 2);
+
+        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_right_${i + 1}` });
+    }
   }
 
   private createDeck() {
