@@ -12,6 +12,7 @@ export default function Client() {
     connected,
     gameState,
     hand,
+    peerId,
     drawCard,
     playCards,
     returnCards,
@@ -236,10 +237,7 @@ export default function Client() {
           <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players</h2>
           <div className="flex overflow-x-auto gap-3 pb-2">
             {Object.values(gameState.players).map(p => {
-              // Note: client doesn't know its own Peer ID here directly,
-              // but we filter by name mismatch for simplicity or just show all for demo.
-              // A better way is to pass peerId to client from hook.
-              if (p.name === playerName) return null;
+              if (p.id === peerId) return null;
 
               return (
                 <div
