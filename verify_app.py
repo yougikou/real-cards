@@ -1,3 +1,4 @@
+import os
 from playwright.sync_api import sync_playwright
 
 def run():
@@ -5,7 +6,8 @@ def run():
         browser = p.chromium.launch()
         page = browser.new_page()
         # Navigate to the preview URL with the base path
-        page.goto("http://localhost:4173/real-cards/")
+        app_url = os.environ.get("APP_URL", "http://localhost:4173/real-cards/")
+        page.goto(app_url)
         # Wait for the app to load by checking for some text or element
         page.wait_for_selector("#root", state="attached")
         # Give it a tiny bit of time to render JS
