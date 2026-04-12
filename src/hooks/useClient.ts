@@ -6,6 +6,7 @@ export function useClient(hostId: string, playerName: string) {
   const [connected, setConnected] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [hand, setHand] = useState<Card[]>([]);
+  const [peerId, setPeerId] = useState<string | null>(null);
 
   const connRef = useRef<DataConnection | null>(null);
 
@@ -14,7 +15,8 @@ export function useClient(hostId: string, playerName: string) {
 
     const peer = new Peer();
 
-    peer.on('open', () => {
+    peer.on('open', (id) => {
+      setPeerId(id);
       const conn = peer.connect(hostId);
       connRef.current = conn;
 
@@ -85,6 +87,7 @@ export function useClient(hostId: string, playerName: string) {
     connected,
     gameState,
     hand,
+    peerId,
     drawCard,
     playCards,
     returnCards,
