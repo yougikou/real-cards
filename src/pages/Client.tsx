@@ -42,10 +42,10 @@ export default function Client() {
     }
   };
 
-  const handleReturnSelected = () => {
+  const handleReturnSelected = (toTop: boolean = false) => {
     const cardsToReturn = hand.filter(c => selectedCards.includes(c.id));
     if (cardsToReturn.length > 0) {
-      returnCards(cardsToReturn, false);
+      returnCards(cardsToReturn, toTop);
       setSelectedCards([]);
     }
   };
@@ -78,7 +78,7 @@ export default function Client() {
     // Swiped DOWN
     if (dragY > 50) {
       if (selectedCards.length > 0) {
-        handleReturnSelected();
+        handleReturnSelected(false);
       } else {
         drawCard(1);
       }
@@ -238,17 +238,34 @@ export default function Client() {
       </div>
 
       {/* Bottom Draw/Return Zone Indicator */}
-      <div
-        className="mt-4 h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleSwipeDownDrawReturn}
-      >
-        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none">
-          ↓ Swipe down to
-          <br />
-          {selectedCards.length > 0 ? `RETURN (${selectedCards.length})` : 'DRAW (1)'}
-        </span>
-      </div>
+      {selectedCards.length > 0 ? (
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={() => handleReturnSelected(true)}
+            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 rounded-xl border-2 border-gray-600 transition-colors uppercase tracking-wider text-sm"
+          >
+            Return to Top
+          </button>
+          <button
+            onClick={() => handleReturnSelected(false)}
+            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 rounded-xl border-2 border-gray-600 transition-colors uppercase tracking-wider text-sm"
+          >
+            Return to Bottom
+          </button>
+        </div>
+      ) : (
+        <div
+          className="mt-4 h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleSwipeDownDrawReturn}
+        >
+          <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none">
+            ↓ Swipe down to
+            <br />
+            DRAW (1)
+          </span>
+        </div>
+      )}
 
       {/* Other Players Area */}
       {gameState && Object.keys(gameState.players).length > 1 && (
