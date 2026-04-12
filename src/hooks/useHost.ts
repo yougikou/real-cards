@@ -4,6 +4,10 @@ import type { Card, GameState, ClientAction, HostMessage } from '../types';
 import { createDeck } from '../utils/deck';
 
 export function useHost() {
+  const [status, setStatus] = useState<'starting' | 'ready' | 'failed' | 'reconnecting'>('starting');
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
   const [peerId, setPeerId] = useState<string>('');
   const [gameState, setGameState] = useState<GameState>({
     deckCount: 54,
@@ -11,6 +15,12 @@ export function useHost() {
     playStack: [],
     players: {},
   });
+
+  const retry = () => {
+    setStatus('starting');
+    setError(null);
+    setRetryCount(prev => prev + 1);
+  };
 
   const peerRef = useRef<Peer | null>(null);
   const connectionsRef = useRef<Record<string, DataConnection>>({});
@@ -202,9 +212,14 @@ export function useHost() {
 
     peer.on('open', (id) => {
       setPeerId(id);
+      setStatus('ready');
     });
 
     peer.on('connection', (conn) => {
+      // Clean up stale connection
+      if (connectionsRef.current[conn.peer]) {
+        connectionsRef.current[conn.peer].close();
+      }
       connectionsRef.current[conn.peer] = conn;
 
       conn.on('data', (data: unknown) => {
@@ -222,11 +237,21 @@ export function useHost() {
       });
     });
 
+    peer.on('error', (err) => {
+      setStatus('failed');
+      setError(`Host connection error: ${err.message}`);
+    });
+
+    peer.on('disconnected', () => {
+      setStatus('reconnecting');
+      peer.reconnect();
+    });
+
     return () => {
       peer.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [retryCount]);
 
-  return { peerId, gameState, updateStateAndBroadcast, serverStateRef };
+  return { status, error, retry, peerId, gameState, updateStateAndBroadcast, serverStateRef };
 }

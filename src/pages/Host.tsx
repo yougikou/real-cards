@@ -3,10 +3,25 @@ import { useHost } from '../hooks/useHost';
 import PhaserTable from './PhaserTable';
 
 export default function Host() {
-  const { peerId, gameState } = useHost();
+  const { status, error, retry, peerId, gameState } = useHost();
 
-  if (!peerId) {
+  if (status === 'starting') {
     return <div className="flex justify-center items-center h-screen">Initializing Host...</div>;
+  }
+
+  if (status === 'failed') {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen space-y-4 p-4 text-center">
+        <div className="text-red-500 font-bold text-xl">Host Error</div>
+        <p>{error}</p>
+        <button
+          onClick={retry}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Retry Host
+        </button>
+      </div>
+    );
   }
 
   const joinUrl = `${window.location.origin}${window.location.pathname}#/client/${peerId}`;
@@ -17,8 +32,14 @@ export default function Host() {
         <PhaserTable />
       </div>
 
+      {status === 'reconnecting' && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center py-2 font-bold shadow-md">
+          Reconnecting to signaling server...
+        </div>
+      )}
+
       <div className="absolute inset-0 z-10 pointer-events-none flex flex-col p-4 text-white">
-        <div className="absolute top-4 left-4 bg-white/10 p-4 rounded-lg flex gap-4 items-center">
+        <div className="absolute top-4 left-4 bg-white/10 p-4 rounded-lg flex gap-4 items-center mt-8">
           <div className="bg-white p-2 rounded">
             <QRCodeSVG value={joinUrl} size={100} />
           </div>
