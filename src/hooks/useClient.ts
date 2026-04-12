@@ -3,17 +3,33 @@ import Peer, { type DataConnection } from 'peerjs';
 import type { Card, GameState, ClientAction, HostMessage } from '../types';
 
 export function useClient(hostId: string, playerName: string) {
-  const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState<'connecting' | 'connected' | 'failed' | 'retrying'>('connecting');
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [hand, setHand] = useState<Card[]>([]);
   const [peerId, setPeerId] = useState<string | null>(null);
 
   const connRef = useRef<DataConnection | null>(null);
 
+  const retry = () => {
+    setStatus('retrying');
+    setError(null);
+    setRetryCount(prev => prev + 1);
+  };
+
   useEffect(() => {
     if (!hostId) return;
 
     const peer = new Peer();
+
+    // Timeout to catch connection hangs
+    const timeout = setTimeout(() => {
+      setStatus('failed');
+      setError('Connection timed out. Host might be offline or ID is incorrect.');
+      peer.destroy();
+    }, 10000);
 
     peer.on('open', (id) => {
       setPeerId(id);
@@ -21,7 +37,8 @@ export function useClient(hostId: string, playerName: string) {
       connRef.current = conn;
 
       conn.on('open', () => {
-        setConnected(true);
+        clearTimeout(timeout);
+        setStatus('connected');
         conn.send({ type: 'JOIN', payload: { name: playerName } });
       });
 
@@ -44,17 +61,36 @@ export function useClient(hostId: string, playerName: string) {
       });
 
       conn.on('close', () => {
-        setConnected(false);
+        setStatus('failed');
+        setError('Connection to host closed.');
+      });
+
+      conn.on('error', (err) => {
+        setStatus('failed');
+        setError(`Connection error: ${err.message}`);
       });
     });
 
+    peer.on('error', (err) => {
+      clearTimeout(timeout);
+      setStatus('failed');
+      setError(`Peer connection error: ${err.message}`);
+    });
+
+    peer.on('disconnected', () => {
+      clearTimeout(timeout);
+      setStatus('failed');
+      setError('Disconnected from peer server.');
+    });
+
     return () => {
+      clearTimeout(timeout);
       peer.destroy();
     };
-  }, [hostId, playerName]);
+  }, [hostId, playerName, retryCount]);
 
   const sendAction = (action: ClientAction) => {
-    if (connRef.current && connected) {
+    if (connRef.current && status === 'connected') {
       connRef.current.send(action);
     }
   };
@@ -84,7 +120,9 @@ export function useClient(hostId: string, playerName: string) {
   };
 
   return {
-    connected,
+    status,
+    error,
+    retry,
     gameState,
     hand,
     peerId,
