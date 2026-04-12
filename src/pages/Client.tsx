@@ -9,7 +9,9 @@ export default function Client() {
   const playerName = searchParams.get('name') || 'Player';
 
   const {
-    connected,
+    status,
+    error,
+    retry,
     gameState,
     hand,
     peerId,
@@ -84,11 +86,28 @@ export default function Client() {
   };
 
 
-  if (!connected) {
+  if (status !== 'connected') {
     return (
-      <div className="flex flex-col justify-center items-center h-screen bg-gray-900 text-white">
-        <div className="animate-pulse text-2xl font-bold mb-4">Connecting to Host...</div>
-        <div className="text-gray-400">Room ID: {hostId}</div>
+      <div className="flex flex-col justify-center items-center h-screen bg-gray-900 text-white p-4">
+        {status === 'failed' ? (
+          <div className="text-center">
+            <div className="text-red-500 text-2xl font-bold mb-4">Connection Failed</div>
+            <div className="text-gray-300 mb-6">{error}</div>
+            <button
+              onClick={retry}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+            >
+              Retry Connection
+            </button>
+          </div>
+        ) : (
+          <div className="text-center">
+            <div className="animate-pulse text-2xl font-bold mb-4">
+              {status === 'retrying' ? 'Retrying connection...' : 'Connecting to Host...'}
+            </div>
+            <div className="text-gray-400">Room ID: {hostId}</div>
+          </div>
+        )}
       </div>
     );
   }
