@@ -77,9 +77,7 @@ export default function Client() {
 
     // Swiped DOWN
     if (dragY > 50) {
-      if (selectedCards.length > 0) {
-        handleReturnSelected(false);
-      } else {
+      if (selectedCards.length === 0) {
         drawCard(1);
       }
     }
@@ -244,9 +242,15 @@ export default function Client() {
         onTouchEnd={handleSwipeDownDrawReturn}
       >
         <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none">
-          ↓ Swipe down to
-          <br />
-          {selectedCards.length > 0 ? 'RETURN' : 'DRAW (1)'}
+          {selectedCards.length > 0 ? (
+            'CHOOSE RETURN DIRECTION:'
+          ) : (
+            <>
+              ↓ Swipe down to
+              <br />
+              DRAW (1)
+            </>
+          )}
         </span>
 
         {selectedCards.length > 0 && (
