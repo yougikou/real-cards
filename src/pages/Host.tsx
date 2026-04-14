@@ -5,25 +5,6 @@ import PhaserTable from './PhaserTable';
 export default function Host() {
   const { status, error, retry, peerId, gameState } = useHost();
 
-  if (status === 'starting') {
-    return <div className="flex justify-center items-center h-screen">Initializing Host...</div>;
-  }
-
-  if (status === 'failed') {
-    return (
-      <div className="flex flex-col justify-center items-center h-screen space-y-4 p-4 text-center">
-        <div className="text-red-500 font-bold text-xl">Host Error</div>
-        <p>{error}</p>
-        <button
-          onClick={retry}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Retry Host
-        </button>
-      </div>
-    );
-  }
-
   const joinUrl = `${window.location.origin}${window.location.pathname}#/client/${peerId}`;
 
   return (
@@ -32,9 +13,34 @@ export default function Host() {
         <PhaserTable />
       </div>
 
+      {status === 'starting' && (
+        <div className="absolute inset-0 z-50 bg-black/80 flex justify-center items-center text-white">
+          Initializing Host...
+        </div>
+      )}
+
+      {status === 'failed' && (
+        <div className="absolute inset-0 z-50 bg-black/80 flex flex-col justify-center items-center space-y-4 p-4 text-center text-white">
+          <div className="text-red-500 font-bold text-xl">Host Error</div>
+          <p>{error}</p>
+          <button
+            onClick={retry}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry Host
+          </button>
+        </div>
+      )}
+
       {status === 'reconnecting' && (
-        <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center py-2 font-bold shadow-md">
-          Reconnecting to signaling server...
+        <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center py-2 font-bold shadow-md flex justify-center items-center space-x-4">
+          <span>Reconnecting to signaling server...</span>
+          <button
+            onClick={retry}
+            className="px-3 py-1 bg-black text-white text-sm rounded hover:bg-gray-800"
+          >
+            Force Retry
+          </button>
         </div>
       )}
 
