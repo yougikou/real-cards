@@ -206,11 +206,16 @@ export function useHost() {
     }
   };
 
+  // Keep track of our established ID so we can recover the exact same room if we need a full recreation
+  const targetIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    const peer = new Peer();
+    // If we're retrying after a full failure, attempt to reclaim the same ID
+    const peer = targetIdRef.current ? new Peer(targetIdRef.current) : new Peer();
     peerRef.current = peer;
 
     peer.on('open', (id) => {
+      targetIdRef.current = id;
       setPeerId(id);
       setStatus('ready');
     });
@@ -238,13 +243,34 @@ export function useHost() {
     });
 
     peer.on('error', (err) => {
+      // Filter out non-fatal errors to prevent crashing the host
+      const type = err.type as string;
+      if (type === 'peer-unavailable' || type === 'network' || type === 'server-error' || type === 'webrtc') {
+        console.warn(`Non-fatal host error: ${type} - ${err.message}`);
+        return;
+      }
       setStatus('failed');
       setError(`Host connection error: ${err.message}`);
     });
 
     peer.on('disconnected', () => {
       setStatus('reconnecting');
-      peer.reconnect();
+      // Add a small delay before reconnecting to prevent tight loops on total network loss
+      setTimeout(() => {
+        if (!peer.destroyed) {
+          peer.reconnect();
+
+          // Poll to ensure UI recovers if the 'open' event is missed or delayed
+          const checkInterval = setInterval(() => {
+            if (peer.destroyed || peer.disconnected) {
+              clearInterval(checkInterval);
+            } else if (!peer.disconnected && peer.open) {
+              setStatus('ready');
+              clearInterval(checkInterval);
+            }
+          }, 500);
+        }
+      }, 1000);
     });
 
     return () => {
