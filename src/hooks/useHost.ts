@@ -210,17 +210,20 @@ export function useHost() {
   const targetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    let isCleaningUp = false;
     // If we're retrying after a full failure, attempt to reclaim the same ID
     const peer = targetIdRef.current ? new Peer(targetIdRef.current) : new Peer();
     peerRef.current = peer;
 
     peer.on('open', (id) => {
+      if (isCleaningUp) return;
       targetIdRef.current = id;
       setPeerId(id);
       setStatus('ready');
     });
 
     peer.on('connection', (conn) => {
+      if (isCleaningUp) return;
       // Clean up stale connection
       if (connectionsRef.current[conn.peer]) {
         connectionsRef.current[conn.peer].close();
@@ -243,6 +246,7 @@ export function useHost() {
     });
 
     peer.on('error', (err) => {
+      if (isCleaningUp) return;
       // Filter out non-fatal errors to prevent crashing the host
       const type = err.type as string;
       if (type === 'peer-unavailable' || type === 'network' || type === 'server-error' || type === 'webrtc') {
@@ -254,15 +258,18 @@ export function useHost() {
     });
 
     peer.on('disconnected', () => {
+      if (isCleaningUp) return;
       setStatus('reconnecting');
       // Add a small delay before reconnecting to prevent tight loops on total network loss
       setTimeout(() => {
-        if (!peer.destroyed) {
+        if (!peer.destroyed && !isCleaningUp) {
           peer.reconnect();
 
           // Poll to ensure UI recovers if the 'open' event is missed or delayed
           const checkInterval = setInterval(() => {
-            if (peer.destroyed || peer.disconnected) {
+            if (isCleaningUp) {
+              clearInterval(checkInterval);
+            } else if (peer.destroyed || peer.disconnected) {
               clearInterval(checkInterval);
             } else if (!peer.disconnected && peer.open) {
               setStatus('ready');
@@ -273,7 +280,14 @@ export function useHost() {
       }, 1000);
     });
 
+    peer.on('close', () => {
+      if (isCleaningUp) return;
+      setStatus('failed');
+      setError('Connection to signaling server closed.');
+    });
+
     return () => {
+      isCleaningUp = true;
       peer.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
