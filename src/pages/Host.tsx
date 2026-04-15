@@ -13,36 +13,38 @@ export default function Host() {
         <PhaserTable />
       </div>
 
-      {status === 'starting' && (
-        <div className="absolute inset-0 z-50 bg-black/80 flex justify-center items-center text-white">
-          Initializing Host...
+      {/* Connection Status Indicator */}
+      <div className="absolute top-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
+        <div className={`pointer-events-auto flex items-center space-x-3 px-4 py-2 rounded-full shadow-lg border text-sm font-medium ${
+          status === 'ready' ? 'bg-green-900/80 border-green-500 text-green-100' :
+          status === 'starting' ? 'bg-blue-900/80 border-blue-500 text-blue-100' :
+          status === 'reconnecting' ? 'bg-yellow-900/80 border-yellow-500 text-yellow-100' :
+          'bg-red-900/80 border-red-500 text-red-100'
+        }`}>
+          <span className="flex items-center space-x-2">
+            <span className={`w-2 h-2 rounded-full ${
+              status === 'ready' ? 'bg-green-400' :
+              status === 'starting' ? 'bg-blue-400 animate-pulse' :
+              status === 'reconnecting' ? 'bg-yellow-400 animate-pulse' :
+              'bg-red-400'
+            }`} />
+            <span>
+              {status === 'ready' && 'Host Connected'}
+              {status === 'starting' && 'Starting Host...'}
+              {status === 'reconnecting' && 'Reconnecting...'}
+              {status === 'failed' && `Connection Failed: ${error || 'Unknown error'}`}
+            </span>
+          </span>
+          {status !== 'ready' && (
+            <button
+              onClick={retry}
+              className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-xs transition-colors"
+            >
+              Retry
+            </button>
+          )}
         </div>
-      )}
-
-      {status === 'failed' && (
-        <div className="absolute inset-0 z-50 bg-black/80 flex flex-col justify-center items-center space-y-4 p-4 text-center text-white">
-          <div className="text-red-500 font-bold text-xl">Host Error</div>
-          <p>{error}</p>
-          <button
-            onClick={retry}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Retry Host
-          </button>
-        </div>
-      )}
-
-      {status === 'reconnecting' && (
-        <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center py-2 font-bold shadow-md flex justify-center items-center space-x-4">
-          <span>Reconnecting to signaling server...</span>
-          <button
-            onClick={retry}
-            className="px-3 py-1 bg-black text-white text-sm rounded hover:bg-gray-800"
-          >
-            Force Retry
-          </button>
-        </div>
-      )}
+      </div>
 
       <div className="absolute inset-0 z-10 pointer-events-none flex flex-col p-4 text-white">
         <div className="absolute top-4 left-4 bg-white/10 p-4 rounded-lg flex gap-4 items-center mt-8">
