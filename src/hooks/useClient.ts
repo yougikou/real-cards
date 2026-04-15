@@ -3,7 +3,7 @@ import Peer, { type DataConnection } from 'peerjs';
 import type { Card, GameState, ClientAction, HostMessage } from '../types';
 
 export function useClient(hostId: string, playerName: string) {
-  const [status, setStatus] = useState<'connecting' | 'connected' | 'failed' | 'retrying'>('connecting');
+  const [status, setStatus] = useState<'connecting' | 'connected' | 'failed' | 'retrying' | 'reconnecting'>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -21,28 +21,33 @@ export function useClient(hostId: string, playerName: string) {
 
   useEffect(() => {
     if (!hostId) return;
+    let isCleaningUp = false;
 
     const peer = new Peer();
 
     // Timeout to catch connection hangs
     const timeout = setTimeout(() => {
+      if (isCleaningUp) return;
       setStatus('failed');
       setError('Connection timed out. Host might be offline or ID is incorrect.');
       peer.destroy();
     }, 10000);
 
     peer.on('open', (id) => {
+      if (isCleaningUp) return;
       setPeerId(id);
       const conn = peer.connect(hostId);
       connRef.current = conn;
 
       conn.on('open', () => {
+        if (isCleaningUp) return;
         clearTimeout(timeout);
         setStatus('connected');
         conn.send({ type: 'JOIN', payload: { name: playerName } });
       });
 
       conn.on('data', (data: unknown) => {
+        if (isCleaningUp) return;
         const message = data as HostMessage;
         switch (message.type) {
           case 'STATE_UPDATE':
@@ -61,29 +66,46 @@ export function useClient(hostId: string, playerName: string) {
       });
 
       conn.on('close', () => {
+        if (isCleaningUp) return;
         setStatus('failed');
         setError('Connection to host closed.');
       });
 
       conn.on('error', (err) => {
+        if (isCleaningUp) return;
         setStatus('failed');
         setError(`Connection error: ${err.message}`);
       });
     });
 
     peer.on('error', (err) => {
+      if (isCleaningUp) return;
+
+      const type = err.type as string;
+      // peer-unavailable is fatal for the client trying to join a specific host room
+      if (type === 'network' || type === 'webrtc') {
+        console.warn(`Non-fatal client error: ${type} - ${err.message}`);
+        return;
+      }
+
       clearTimeout(timeout);
       setStatus('failed');
       setError(`Peer connection error: ${err.message}`);
     });
 
     peer.on('disconnected', () => {
+      if (isCleaningUp) return;
       clearTimeout(timeout);
-      setStatus('failed');
-      setError('Disconnected from peer server.');
+      setStatus('reconnecting');
+      setTimeout(() => {
+        if (!peer.destroyed && !isCleaningUp) {
+          peer.reconnect();
+        }
+      }, 1000);
     });
 
     return () => {
+      isCleaningUp = true;
       clearTimeout(timeout);
       peer.destroy();
     };
