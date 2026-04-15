@@ -47,15 +47,32 @@ export default function Host() {
       </div>
 
       <div className="absolute inset-0 z-10 pointer-events-none flex flex-col p-4 text-white">
-        <div className="absolute top-4 left-4 bg-white/10 p-4 rounded-lg flex gap-4 items-center mt-8">
-          <div className="bg-white p-2 rounded">
-            <QRCodeSVG value={joinUrl} size={100} />
+        {status === 'ready' && peerId ? (
+          <div className="absolute top-4 left-4 bg-white/10 p-4 rounded-lg flex gap-4 items-center mt-8">
+            <div className="bg-white p-2 rounded">
+              <QRCodeSVG value={joinUrl} size={100} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Scan to Join</h2>
+              <p className="text-sm opacity-80 mt-1">Room ID: {peerId}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold">Scan to Join</h2>
-            <p className="text-sm opacity-80 mt-1">Room ID: {peerId}</p>
+        ) : (
+          <div className="absolute top-4 left-4 bg-black/60 border border-white/20 p-4 rounded-lg flex gap-4 items-center mt-8 pointer-events-auto">
+            <div className="flex flex-col">
+              <h2 className="text-xl font-bold text-yellow-400">Host Not Ready</h2>
+              <p className="text-sm opacity-80 mt-1">Waiting for connection...</p>
+              {status === 'failed' && (
+                <button
+                  onClick={retry}
+                  className="mt-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded text-sm transition-colors border border-white/30"
+                >
+                  Retry Connection
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex-grow flex items-center justify-center pointer-events-none">
           {/* Play Area Overlay (mostly invisible to allow interaction with Phaser) */}
