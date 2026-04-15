@@ -263,19 +263,9 @@ export function useHost() {
       // Add a small delay before reconnecting to prevent tight loops on total network loss
       setTimeout(() => {
         if (!peer.destroyed && !isCleaningUp) {
+          // Calling peer.reconnect() reinitializes the socket and correctly triggers
+          // the 'open' event again upon success, cleanly resolving the reconnect UI state.
           peer.reconnect();
-
-          // Poll to ensure UI recovers if the 'open' event is missed or delayed
-          const checkInterval = setInterval(() => {
-            if (isCleaningUp) {
-              clearInterval(checkInterval);
-            } else if (peer.destroyed || peer.disconnected) {
-              clearInterval(checkInterval);
-            } else if (!peer.disconnected && peer.open) {
-              setStatus('ready');
-              clearInterval(checkInterval);
-            }
-          }, 500);
         }
       }, 1000);
     });
