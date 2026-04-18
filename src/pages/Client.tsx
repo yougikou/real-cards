@@ -95,7 +95,7 @@ export default function Client() {
             <div className="text-gray-300 mb-6">{error}</div>
             <button
               onClick={retry}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg active:scale-95 transition-all"
             >
               Retry Connection
             </button>
@@ -103,7 +103,7 @@ export default function Client() {
         ) : (
           <div className="text-center">
             <div className="animate-pulse text-2xl font-bold mb-4">
-              {status === 'retrying' ? 'Retrying connection...' : 'Connecting to Host...'}
+              {status === 'retrying' ? 'Retrying connection...' : status === 'reconnecting' ? 'Reconnecting to server...' : 'Connecting to Host...'}
             </div>
             <div className="text-gray-400">Room ID: {hostId}</div>
           </div>

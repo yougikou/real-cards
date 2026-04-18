@@ -60,12 +60,16 @@ export default function Host() {
         ) : (
           <div className="absolute top-4 left-4 bg-black/60 border border-white/20 p-4 rounded-lg flex gap-4 items-center mt-8 pointer-events-auto">
             <div className="flex flex-col">
-              <h2 className="text-xl font-bold text-yellow-400">Host Not Ready</h2>
-              <p className="text-sm opacity-80 mt-1">Waiting for connection...</p>
+              <h2 className={`text-xl font-bold ${status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
+                {status === 'failed' ? 'Connection Failed' : 'Host Not Ready'}
+              </h2>
+              <p className="text-sm opacity-80 mt-1 max-w-xs break-words">
+                {status === 'failed' && error ? error : 'Waiting for connection...'}
+              </p>
               {status === 'failed' && (
                 <button
                   onClick={retry}
-                  className="mt-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded text-sm transition-colors border border-white/30"
+                  className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg active:scale-95 transition-all"
                 >
                   Retry Connection
                 </button>
