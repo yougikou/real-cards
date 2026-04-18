@@ -25,6 +25,38 @@ export function useHost() {
   const peerRef = useRef<Peer | null>(null);
   const connectionsRef = useRef<Record<string, DataConnection>>({});
 
+  const resetGame = () => {
+    serverStateRef.current.deck = createDeck();
+
+    Object.keys(serverStateRef.current.playerHands).forEach(clientId => {
+      const hand = serverStateRef.current.playerHands[clientId];
+      if (hand.length > 0) {
+        const cardIds = hand.map(c => c.id);
+        const msg: HostMessage = { type: 'REMOVE_CARDS', payload: cardIds };
+        connectionsRef.current[clientId]?.send(msg);
+      }
+      serverStateRef.current.playerHands[clientId] = [];
+    });
+
+    updateStateAndBroadcast(prev => {
+      const newPlayers = { ...prev.players };
+      Object.keys(newPlayers).forEach(clientId => {
+        newPlayers[clientId] = {
+          ...newPlayers[clientId],
+          handCount: 0
+        };
+      });
+
+      return {
+        ...prev,
+        deckCount: serverStateRef.current.deck.length,
+        playStack: [],
+        discardPile: [],
+        players: newPlayers
+      };
+    });
+  };
+
   // Keep true deck and hands server-side
   const serverStateRef = useRef({
     deck: createDeck(),
@@ -283,5 +315,5 @@ export function useHost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryCount]);
 
-  return { status, error, retry, peerId, gameState, updateStateAndBroadcast, serverStateRef };
+  return { status, error, retry, peerId, gameState, updateStateAndBroadcast, serverStateRef, resetGame };
 }

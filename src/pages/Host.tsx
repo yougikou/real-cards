@@ -3,7 +3,7 @@ import { useHost } from '../hooks/useHost';
 import PhaserTable from './PhaserTable';
 
 export default function Host() {
-  const { status, error, retry, peerId, gameState } = useHost();
+  const { status, error, retry, peerId, gameState, resetGame } = useHost();
 
   const joinUrl = `${window.location.origin}${window.location.pathname}#/client/${peerId}`;
 
@@ -78,22 +78,71 @@ export default function Host() {
           </div>
         )}
 
-        <div className="flex-grow flex items-center justify-center pointer-events-none">
-          {/* Play Area Overlay (mostly invisible to allow interaction with Phaser) */}
+        <div className="flex-grow flex items-center justify-center pointer-events-none relative">
+          {/* Play Area Overlay */}
+          <div className="relative w-64 h-64 flex items-center justify-center">
+            {gameState.playStack.map((batch, batchIndex) => {
+              // Offset each batch slightly so we can see the stack
+              const offsetX = batchIndex * 10;
+              const offsetY = batchIndex * -10;
+              const rotation = (batchIndex % 3 - 1) * 5; // slight rotation -5, 0, 5
+
+              return (
+                <div
+                  key={batchIndex}
+                  className="absolute transition-all duration-300 pointer-events-auto shadow-2xl"
+                  style={{
+                    transform: `translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg)`,
+                    zIndex: batchIndex,
+                  }}
+                >
+                  <div className="flex -space-x-12">
+                    {batch.map((card, cardIndex) => {
+                      const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
+                      return (
+                        <div
+                          key={card.id}
+                          className="w-24 h-36 bg-white rounded-lg shadow-md border border-gray-300 flex flex-col justify-between p-2 relative"
+                          style={{ zIndex: cardIndex }}
+                        >
+                          <div className={`text-sm font-bold ${color}`}>{card.rank}</div>
+                          <div className={`text-2xl self-center ${color}`}>
+                            {card.suit === 'hearts' && '♥'}
+                            {card.suit === 'diamonds' && '♦'}
+                            {card.suit === 'clubs' && '♣'}
+                            {card.suit === 'spades' && '♠'}
+                            {card.suit === 'none' && '🃏'}
+                          </div>
+                          <div className={`text-sm font-bold rotate-180 ${color}`}>{card.rank}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            {gameState.playStack.length === 0 && (
+              <div className="text-white/20 font-bold text-2xl uppercase tracking-widest border-2 border-dashed border-white/20 p-8 rounded-xl">
+                Play Area
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="absolute top-4 right-4 flex gap-4 pointer-events-auto">
           {/* Deck */}
-          <div className="w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex items-center justify-center cursor-pointer hover:-translate-y-2 transition-transform">
-            <div className="text-center">
-              <div className="text-white/80 font-bold mb-2">Deck</div>
-              <div className="text-3xl font-black">{gameState.deckCount}</div>
-            </div>
+          <div className="w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center">
+            <div className="text-white/80 font-bold mb-2">Deck</div>
+            <div className="text-3xl font-black">{gameState.deckCount}</div>
           </div>
 
-          {/* Discard */}
-          <div className="w-32 h-48 bg-gray-800 rounded-xl shadow-lg border-2 border-white/30 flex items-center justify-center cursor-pointer">
-             <div className="text-white/50 font-bold">Discard</div>
+          {/* Reset & Shuffle (Discard) */}
+          <div
+            onClick={resetGame}
+            className="w-32 h-48 bg-red-900/80 hover:bg-red-800 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center cursor-pointer transition-colors active:scale-95"
+          >
+             <div className="text-white font-bold mb-2 text-center px-2">Reset & Shuffle</div>
+             <div className="text-xl">↺</div>
           </div>
         </div>
 
