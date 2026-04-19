@@ -76,7 +76,7 @@ class TableScene extends Phaser.Scene {
       // Find and destroy all floating cards (both face up and face down)
       const allCards = this.children.list.filter(
         child => child instanceof Phaser.Physics.Matter.Image && child.texture && (child.texture.key === 'cardFront' || child.texture.key === 'cardBack')
-      );
+      ) as Phaser.Physics.Matter.Image[];
       for (const card of allCards) {
         // Do not destroy the static deck sprites
         if (!card.isStatic()) {
