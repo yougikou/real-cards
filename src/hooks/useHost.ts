@@ -55,6 +55,8 @@ export function useHost() {
         players: newPlayers
       };
     });
+
+    window.dispatchEvent(new Event('table-reset'));
   };
 
   // Keep true deck and hands server-side

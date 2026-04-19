@@ -71,6 +71,24 @@ class TableScene extends Phaser.Scene {
     this.setupInteractions();
 
     this.scale.on('resize', this.handleResize, this);
+
+    const onTableReset = () => {
+      // Find and destroy all floating cards (both face up and face down)
+      const allCards = this.children.list.filter(
+        child => child instanceof Phaser.Physics.Matter.Image && child.texture && (child.texture.key === 'cardFront' || child.texture.key === 'cardBack')
+      );
+      for (const card of allCards) {
+        // Do not destroy the static deck sprites
+        if (!card.isStatic()) {
+          card.destroy();
+        }
+      }
+    };
+    window.addEventListener('table-reset', onTableReset);
+
+    this.events.once('destroy', () => {
+      window.removeEventListener('table-reset', onTableReset);
+    });
   }
 
   private handleResize(gameSize: Phaser.Structs.Size) {
