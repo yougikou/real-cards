@@ -1,7 +1,34 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useClient } from '../hooks/useClient';
-import type { Card } from '../types';
+import type { Card, Suit, Rank } from '../types';
+
+const SUIT_ORDER: Record<Suit, number> = {
+  hearts: 1,
+  diamonds: 2,
+  clubs: 3,
+  spades: 4,
+  none: 5,
+};
+
+const RANK_ORDER: Record<Rank, number> = {
+  'JOKER': 1,
+  '2': 2,
+  'A': 3,
+  'K': 4,
+  'Q': 5,
+  'J': 6,
+  '10': 7,
+  '9': 8,
+  '8': 9,
+  '7': 10,
+  '6': 11,
+  '5': 12,
+  '4': 13,
+  '3': 14,
+};
+
+type SortMode = 'draw' | 'suit' | 'rank';
 
 export default function Client() {
   const { hostId } = useParams<{ hostId: string }>();
@@ -28,6 +55,23 @@ export default function Client() {
   // Gesture state
   const [touchStartY, setTouchStartY] = useState(0);
 
+  const [sortMode, setSortMode] = useState<SortMode>('draw');
+
+  const displayHand = useMemo(() => {
+    if (sortMode === 'draw') return hand;
+    return [...hand].sort((a, b) => {
+      if (sortMode === 'suit') {
+        const suitDiff = SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
+        if (suitDiff !== 0) return suitDiff;
+        return RANK_ORDER[a.rank] - RANK_ORDER[b.rank];
+      } else {
+        const rankDiff = RANK_ORDER[a.rank] - RANK_ORDER[b.rank];
+        if (rankDiff !== 0) return rankDiff;
+        return SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
+      }
+    });
+  }, [hand, sortMode]);
+
   const toggleSelect = (cardId: string) => {
     setSelectedCards(prev =>
       prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]
@@ -35,7 +79,7 @@ export default function Client() {
   };
 
   const handlePlaySelected = () => {
-    const cardsToPlay = hand.filter(c => selectedCards.includes(c.id));
+    const cardsToPlay = displayHand.filter(c => selectedCards.includes(c.id));
     if (cardsToPlay.length > 0) {
       playCards(cardsToPlay);
       setSelectedCards([]);
@@ -43,7 +87,7 @@ export default function Client() {
   };
 
   const handleReturnSelected = (toTop: boolean) => {
-    const cardsToReturn = hand.filter(c => selectedCards.includes(c.id));
+    const cardsToReturn = displayHand.filter(c => selectedCards.includes(c.id));
     if (cardsToReturn.length > 0) {
       returnCards(cardsToReturn, toTop);
       setSelectedCards([]);
@@ -201,21 +245,44 @@ export default function Client() {
 
       {/* Hand Area */}
       <div className="flex-grow flex flex-col">
-        <h2 className="text-lg font-bold mb-2 flex justify-between items-center">
-          <span>Your Hand ({hand.length})</span>
-          {selectedCards.length > 0 && (
+        <div className="mb-2">
+          <h2 className="text-lg font-bold flex justify-between items-center mb-2">
+            <span>Your Hand ({hand.length})</span>
+            {selectedCards.length > 0 && (
+              <button
+                 onClick={() => setSelectedCards([])}
+                 className="text-sm text-blue-400 bg-gray-800 px-3 py-1 rounded"
+              >
+                 Clear Selection
+              </button>
+            )}
+          </h2>
+          <div className="flex gap-2">
+            <span className="text-xs text-gray-400 self-center uppercase tracking-wider font-bold">Sort:</span>
             <button
-               onClick={() => setSelectedCards([])}
-               className="text-sm text-blue-400 bg-gray-800 px-3 py-1 rounded"
+              onClick={() => setSortMode('draw')}
+              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'draw' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
             >
-               Clear Selection
+              DRAW
             </button>
-          )}
-        </h2>
+            <button
+              onClick={() => setSortMode('suit')}
+              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'suit' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            >
+              SUIT
+            </button>
+            <button
+              onClick={() => setSortMode('rank')}
+              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'rank' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            >
+              RANK
+            </button>
+          </div>
+        </div>
 
         <div className="flex-grow overflow-y-auto pr-2 pb-4">
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-            {hand.map((card: Card) => {
+            {displayHand.map((card: Card) => {
               const isSelected = selectedCards.includes(card.id);
               const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
 
