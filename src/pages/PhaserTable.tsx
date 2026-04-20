@@ -86,8 +86,15 @@ class TableScene extends Phaser.Scene {
     };
     window.addEventListener('table-reset', onTableReset);
 
+    const onTableRecenter = () => {
+      this.cameras.main.setZoom(1);
+      this.cameras.main.setScroll(0, 0);
+    };
+    window.addEventListener('table-recenter', onTableRecenter);
+
     this.events.once('destroy', () => {
       window.removeEventListener('table-reset', onTableReset);
+      window.removeEventListener('table-recenter', onTableRecenter);
     });
   }
 
@@ -220,7 +227,7 @@ class TableScene extends Phaser.Scene {
     this.dragCard = newCard;
 
     if (this.pointerBody) {
-         this.matter.body.setPosition(this.pointerBody, { x: pointer.x, y: pointer.y });
+         this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
     }
 
     if (this.pointerBody && newCard.body) {
@@ -240,7 +247,10 @@ class TableScene extends Phaser.Scene {
   private setupInteractions() {
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
         if (this.dragCard && this.pointerBody && this.dragConstraint && this.matter) {
-             this.matter.body.setPosition(this.pointerBody, { x: pointer.x, y: pointer.y });
+             this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
+        } else if (pointer.isDown) {
+             this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
+             this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
         }
     });
 
@@ -254,6 +264,11 @@ class TableScene extends Phaser.Scene {
                  this.dragConstraint = null;
              }
          }
+    });
+
+    this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: Phaser.GameObjects.GameObject[], _deltaX: number, deltaY: number) => {
+        const newZoom = this.cameras.main.zoom - (deltaY * 0.001);
+        this.cameras.main.zoom = Phaser.Math.Clamp(newZoom, 0.2, 3);
     });
   }
 
