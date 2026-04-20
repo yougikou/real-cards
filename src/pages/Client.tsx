@@ -71,14 +71,14 @@ export default function Client() {
     }
   };
 
-  const handleSwipeDownDrawReturn = (e: React.TouchEvent) => {
+  const handleSwipeDownDrawReturn = (e: React.TouchEvent, toTop: boolean = false) => {
     const touchEndY = e.changedTouches[0].clientY;
     const dragY = touchEndY - touchStartY;
 
     // Swiped DOWN
     if (dragY > 50) {
       if (selectedCards.length > 0) {
-        handleReturnSelected(false);
+        handleReturnSelected(toTop);
       } else {
         drawCard(1);
       }
@@ -238,34 +238,52 @@ export default function Client() {
       </div>
 
       {/* Bottom Draw/Return Zone Indicator */}
-      <div
-        className="mt-4 min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-3 py-3"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleSwipeDownDrawReturn}
-      >
-        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none">
-          ↓ Swipe down to
-          <br />
-          {selectedCards.length > 0 ? 'RETURN' : 'DRAW (1)'}
-        </span>
-
-        {selectedCards.length > 0 && (
-          <div className="mt-3 flex w-full max-w-md gap-2 pointer-events-auto">
+      {selectedCards.length === 0 ? (
+        <div
+          className="mt-4 min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-3 py-3"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={(e) => handleSwipeDownDrawReturn(e)}
+        >
+          <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none">
+            ↓ Swipe down to
+            <br />
+            DRAW (1)
+          </span>
+        </div>
+      ) : (
+        <div className="mt-4 flex gap-2 w-full">
+          <div
+            className="flex-1 min-h-20 border-2 border-dashed border-blue-600 rounded-xl flex flex-col items-center justify-center bg-blue-900/30 cursor-pointer px-2 py-3"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={(e) => handleSwipeDownDrawReturn(e, true)}
+          >
+            <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-xs pointer-events-none mb-2">
+              ↓ Swipe down
+            </span>
             <button
               onClick={() => handleReturnSelected(true)}
-              className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700 active:scale-95"
+              className="w-full max-w-[150px] rounded-lg bg-blue-600 px-2 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto"
             >
-              Return to Top
-            </button>
-            <button
-              onClick={() => handleReturnSelected(false)}
-              className="flex-1 rounded-lg bg-gray-700 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-600 active:scale-95"
-            >
-              Return to Bottom
+              Return Top
             </button>
           </div>
-        )}
-      </div>
+          <div
+            className="flex-1 min-h-20 border-2 border-dashed border-gray-500 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-2 py-3"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={(e) => handleSwipeDownDrawReturn(e, false)}
+          >
+            <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-xs pointer-events-none mb-2">
+              ↓ Swipe down
+            </span>
+            <button
+              onClick={() => handleReturnSelected(false)}
+              className="w-full max-w-[150px] rounded-lg bg-gray-700 px-2 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto"
+            >
+              Return Bottom
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Other Players Area */}
       {gameState && Object.keys(gameState.players).length > 1 && (
