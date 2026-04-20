@@ -152,6 +152,18 @@ export default function Host() {
           </div>
         </div>
 
+        {/* Navigation Affordance / Controls */}
+        <div className="absolute bottom-32 left-4 bg-black/60 border border-white/20 p-3 rounded-lg text-white/90 text-sm flex gap-4 pointer-events-auto backdrop-blur-sm shadow-lg">
+          <span className="flex items-center gap-2">🖐️ Drag to pan</span>
+          <span className="flex items-center gap-2">🔍 Scroll to zoom</span>
+          <button
+            onClick={() => window.dispatchEvent(new Event('table-recenter'))}
+            className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded transition-colors active:scale-95"
+          >
+            Recenter View
+          </button>
+        </div>
+
         {/* Players Ring */}
         <div className="absolute bottom-4 left-4 right-4 flex justify-around pointer-events-none">
           {Object.values(gameState.players).map(player => (
