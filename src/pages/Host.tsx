@@ -86,16 +86,22 @@ export default function Host() {
               const offsetX = batchIndex * 10;
               const offsetY = batchIndex * -10;
               const rotation = (batchIndex % 3 - 1) * 5; // slight rotation -5, 0, 5
+              const isTopBatch = batchIndex === gameState.playStack.length - 1;
 
               return (
                 <div
                   key={batchIndex}
-                  className="absolute transition-all duration-300 pointer-events-auto shadow-2xl"
+                  className={`absolute transition-all duration-300 pointer-events-auto ${isTopBatch ? 'ring-4 ring-yellow-400 scale-105 rounded-xl z-50' : 'shadow-2xl'}`}
                   style={{
                     transform: `translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg)`,
-                    zIndex: batchIndex,
+                    zIndex: isTopBatch ? 100 : batchIndex,
                   }}
                 >
+                  {isTopBatch && (
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-black text-xs font-black px-2 py-0.5 rounded shadow-lg whitespace-nowrap z-50">
+                      LATEST PLAY
+                    </div>
+                  )}
                   <div className="flex -space-x-12">
                     {batch.map((card, cardIndex) => {
                       const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
