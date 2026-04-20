@@ -168,19 +168,36 @@ export default function Client() {
         </span>
       </div>
 
-      <div className="flex gap-2 mb-4 justify-end">
-         <button
-            onClick={handleTakeBack}
-            disabled={!gameState || gameState.playStack.length === 0}
-            className={`font-bold py-2 px-4 rounded-lg transition-colors active:scale-95 ${
-              !gameState || gameState.playStack.length === 0
-                ? 'bg-gray-700 text-gray-500'
-                : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-            }`}
-          >
-            TAKE BACK (Undo)
-          </button>
-      </div>
+      {gameState && gameState.playStack.length > 0 && (
+        <div className="mb-4 bg-gray-800 rounded-xl p-3 border border-gray-700 flex flex-col">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Latest Play (Top of Stack)</span>
+            <button
+              onClick={handleTakeBack}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors active:scale-95 shadow-md"
+            >
+              TAKE BACK (Undo)
+            </button>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {gameState.playStack[gameState.playStack.length - 1].map((card: Card) => {
+              const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
+              return (
+                <div key={card.id} className="w-12 h-16 bg-white rounded shadow flex flex-col justify-between p-1 flex-shrink-0">
+                  <div className={`text-xs font-bold leading-none ${color}`}>{card.rank}</div>
+                  <div className={`text-lg self-center leading-none ${color}`}>
+                    {card.suit === 'hearts' && '♥'}
+                    {card.suit === 'diamonds' && '♦'}
+                    {card.suit === 'clubs' && '♣'}
+                    {card.suit === 'spades' && '♠'}
+                    {card.suit === 'none' && '🃏'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Hand Area */}
       <div className="flex-grow flex flex-col">
