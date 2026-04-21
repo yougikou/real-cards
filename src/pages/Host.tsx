@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useHost } from '../hooks/useHost';
 import PhaserTable from './PhaserTable';
+import { playShuffleSound } from '../utils/audio/shuffle';
 
 export default function Host() {
   const { status, error, retry, peerId, gameState, resetGame } = useHost();
@@ -149,7 +150,10 @@ export default function Host() {
 
           {/* Reset & Shuffle (Discard) */}
           <div
-            onClick={resetGame}
+            onClick={() => {
+              resetGame();
+              playShuffleSound();
+            }}
             className="w-32 h-48 bg-red-900/80 hover:bg-red-800 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center cursor-pointer transition-colors active:scale-95"
           >
              <div className="text-white font-bold mb-2 text-center px-2">Reset & Shuffle</div>
