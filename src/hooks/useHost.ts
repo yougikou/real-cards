@@ -244,6 +244,40 @@ export function useHost() {
   const targetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const handleHostDeal = (e: Event) => {
+      const customEvent = e as CustomEvent<{ playerId: string }>;
+      const { playerId } = customEvent.detail;
+
+      if (!serverStateRef.current.playerHands[playerId]) return;
+      if (serverStateRef.current.deck.length === 0) return;
+
+      const [dealtCard] = serverStateRef.current.deck.splice(0, 1);
+      serverStateRef.current.playerHands[playerId].push(dealtCard);
+
+      const msg: HostMessage = { type: 'RECEIVE_CARDS', payload: [dealtCard] };
+      connectionsRef.current[playerId]?.send(msg);
+
+      updateStateAndBroadcast(prev => ({
+        ...prev,
+        deckCount: serverStateRef.current.deck.length,
+        players: {
+          ...prev.players,
+          [playerId]: {
+            ...prev.players[playerId],
+            handCount: serverStateRef.current.playerHands[playerId].length
+          }
+        }
+      }));
+    };
+
+    window.addEventListener('host-deal-card', handleHostDeal);
+    return () => {
+      window.removeEventListener('host-deal-card', handleHostDeal);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     let isCleaningUp = false;
     // If we're retrying after a full failure, attempt to reclaim the same ID
     const peer = targetIdRef.current ? new Peer(targetIdRef.current) : new Peer();
