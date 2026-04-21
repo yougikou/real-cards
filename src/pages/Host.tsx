@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useHost } from '../hooks/useHost';
 import PhaserTable from './PhaserTable';
@@ -6,6 +7,10 @@ export default function Host() {
   const { status, error, retry, peerId, gameState, resetGame } = useHost();
 
   const joinUrl = `${window.location.origin}${window.location.pathname}#/client/${peerId}`;
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('players-updated', { detail: { players: gameState.players } }));
+  }, [gameState.players]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
@@ -153,7 +158,7 @@ export default function Host() {
         </div>
 
         {/* Navigation Affordance / Controls */}
-        <div className="absolute bottom-32 left-4 bg-black/60 border border-white/20 p-3 rounded-lg text-white/90 text-sm flex gap-4 pointer-events-auto backdrop-blur-sm shadow-lg">
+        <div className="absolute bottom-4 left-4 bg-black/60 border border-white/20 p-3 rounded-lg text-white/90 text-sm flex gap-4 pointer-events-auto backdrop-blur-sm shadow-lg">
           <span className="flex items-center gap-2">🖐️ Drag to pan</span>
           <span className="flex items-center gap-2">🔍 Scroll to zoom</span>
           <button
@@ -162,17 +167,6 @@ export default function Host() {
           >
             Recenter View
           </button>
-        </div>
-
-        {/* Players Ring */}
-        <div className="absolute bottom-4 left-4 right-4 flex justify-around pointer-events-none">
-          {Object.values(gameState.players).map(player => (
-            <div key={player.id} className="bg-black/50 p-4 rounded-xl text-center w-48 border border-white/20">
-              <h3 className="font-bold text-lg truncate">{player.name}</h3>
-              <div className="text-3xl font-black text-yellow-400 mt-2">{player.handCount}</div>
-              <div className="text-sm opacity-70 mt-1">Cards</div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

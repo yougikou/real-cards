@@ -1,15 +1,20 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 
+import type { Player } from '../types';
+
 interface PlayerZone {
   rect: Phaser.GameObjects.Rectangle;
   text?: Phaser.GameObjects.Text;
   zoneId: string;
+  defaultText: string;
+  mappedPlayerId?: string;
 }
 
 class TableScene extends Phaser.Scene {
   private deckSprites: Phaser.GameObjects.Image[] = [];
   private playerZones: PlayerZone[] = [];
+  private connectedPlayers: Player[] = [];
 
   private dragConstraint: MatterJS.ConstraintType | null = null;
   private dragCard: Phaser.Physics.Matter.Image | null = null;
@@ -92,9 +97,17 @@ class TableScene extends Phaser.Scene {
     };
     window.addEventListener('table-recenter', onTableRecenter);
 
+    const onPlayersUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ players: Record<string, Player> }>;
+      this.connectedPlayers = Object.values(customEvent.detail.players);
+      this.updateZoneLabels();
+    };
+    window.addEventListener('players-updated', onPlayersUpdated);
+
     this.events.once('destroy', () => {
       window.removeEventListener('table-reset', onTableReset);
       window.removeEventListener('table-recenter', onTableRecenter);
+      window.removeEventListener('players-updated', onPlayersUpdated);
     });
   }
 
@@ -146,9 +159,10 @@ class TableScene extends Phaser.Scene {
         zone.setStrokeStyle(2, 0xffffff, 0.5);
         if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
-        const text = this.add.text(x, y, `Top Player ${i + 1}`, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5);
+        const defaultText = `Top Seat ${i + 1}`;
+        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5);
 
-        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_top_${i + 1}` });
+        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_top_${i + 1}`, defaultText });
     }
 
     // Bottom zones
@@ -160,9 +174,10 @@ class TableScene extends Phaser.Scene {
         zone.setStrokeStyle(2, 0xffffff, 0.5);
         if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
-        const text = this.add.text(x, y, `Bottom Player ${i + 1}`, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5);
+        const defaultText = `Bottom Seat ${i + 1}`;
+        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5);
 
-        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_bottom_${i + 1}` });
+        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_bottom_${i + 1}`, defaultText });
     }
 
     // Left zones
@@ -174,9 +189,10 @@ class TableScene extends Phaser.Scene {
         zone.setStrokeStyle(2, 0xffffff, 0.5);
         if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
-        const text = this.add.text(x, y, `Left Player ${i + 1}`, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5).setRotation(Math.PI / 2);
+        const defaultText = `Left Seat ${i + 1}`;
+        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5).setRotation(Math.PI / 2);
 
-        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_left_${i + 1}` });
+        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_left_${i + 1}`, defaultText });
     }
 
     // Right zones
@@ -188,9 +204,33 @@ class TableScene extends Phaser.Scene {
         zone.setStrokeStyle(2, 0xffffff, 0.5);
         if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
-        const text = this.add.text(x, y, `Right Player ${i + 1}`, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5).setRotation(-Math.PI / 2);
+        const defaultText = `Right Seat ${i + 1}`;
+        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5).setRotation(-Math.PI / 2);
 
-        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_right_${i + 1}` });
+        this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_right_${i + 1}`, defaultText });
+    }
+
+    this.updateZoneLabels();
+  }
+
+  private updateZoneLabels() {
+    // Map connected players to zones
+    for (let i = 0; i < this.playerZones.length; i++) {
+      const zone = this.playerZones[i];
+      const player = this.connectedPlayers[i];
+      if (player) {
+        zone.mappedPlayerId = player.id;
+        if (zone.text) {
+          zone.text.setText(`${player.name}\nCards: ${player.handCount}`);
+          zone.text.setColor('#fbbf24'); // yellow-400
+        }
+      } else {
+        zone.mappedPlayerId = undefined;
+        if (zone.text) {
+          zone.text.setText(`Empty\n(${zone.defaultText})`);
+          zone.text.setColor('#ffffff');
+        }
+      }
     }
   }
 
@@ -296,14 +336,16 @@ class TableScene extends Phaser.Scene {
             ease: 'Power2',
             onComplete: () => {
                 card.destroy();
-                this.onCardDealt(card.name || Phaser.Math.RND.uuid(), targetZone!.zoneId);
+                if (targetZone?.mappedPlayerId) {
+                  this.onCardDealt(targetZone.mappedPlayerId);
+                }
             }
         });
     }
   }
 
-  private onCardDealt(cardId: string, playerId: string) {
-      console.log(`[Event] Card ${cardId} dealt to player ${playerId}`);
+  private onCardDealt(playerId: string) {
+      window.dispatchEvent(new CustomEvent('host-deal-card', { detail: { playerId } }));
   }
 }
 
