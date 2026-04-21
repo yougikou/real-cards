@@ -97,15 +97,37 @@ export default function Host() {
               return (
                 <div
                   key={batchIndex}
-                  className={`absolute transition-all duration-300 pointer-events-auto ${isTopBatch ? 'ring-4 ring-yellow-400 scale-105 rounded-xl z-50' : 'shadow-2xl'}`}
+                  className={`absolute transition-all duration-300 pointer-events-auto ${isTopBatch ? 'ring-4 ring-yellow-400 scale-105 rounded-xl z-50' : 'shadow-2xl opacity-60'}`}
                   style={{
                     transform: `translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg)`,
                     zIndex: isTopBatch ? 100 : batchIndex,
                   }}
                 >
                   {isTopBatch && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-black text-xs font-black px-2 py-0.5 rounded shadow-lg whitespace-nowrap z-50">
-                      LATEST PLAY
+                    <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-1 z-50">
+                      <div className="bg-yellow-400 text-black text-xs font-black px-2 py-0.5 rounded shadow-lg whitespace-nowrap">
+                        LATEST BATCH
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent('host-return-batch', { detail: { toTop: true } }));
+                          }}
+                          className="bg-black/80 hover:bg-black text-white text-[10px] px-2 py-0.5 rounded border border-white/30 transition-colors"
+                        >
+                          ↑ To Top
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent('host-return-batch', { detail: { toTop: false } }));
+                          }}
+                          className="bg-black/80 hover:bg-black text-white text-[10px] px-2 py-0.5 rounded border border-white/30 transition-colors"
+                        >
+                          ↓ To Bottom
+                        </button>
+                      </div>
                     </div>
                   )}
                   <div className="flex -space-x-12">
@@ -143,9 +165,17 @@ export default function Host() {
 
         <div className="absolute top-4 right-4 flex gap-4 pointer-events-auto">
           {/* Deck */}
-          <div className="w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center">
+          <div
+            onClick={() => {
+              if (gameState.deckCount > 0) {
+                window.dispatchEvent(new Event('host-draw-to-table'));
+              }
+            }}
+            className={`w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center transition-colors ${gameState.deckCount > 0 ? 'cursor-pointer hover:bg-blue-800 active:scale-95' : 'opacity-50'}`}
+          >
             <div className="text-white/80 font-bold mb-2">Deck</div>
             <div className="text-3xl font-black">{gameState.deckCount}</div>
+            {gameState.deckCount > 0 && <div className="text-white/60 text-xs mt-2">Tap to draw</div>}
           </div>
 
           {/* Reset & Shuffle (Discard) */}

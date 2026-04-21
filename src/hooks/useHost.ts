@@ -270,9 +270,48 @@ export function useHost() {
       }));
     };
 
+    const handleHostDrawToTable = () => {
+      if (serverStateRef.current.deck.length === 0) return;
+      const [drawnCard] = serverStateRef.current.deck.splice(0, 1);
+
+      updateStateAndBroadcast(prev => ({
+        ...prev,
+        deckCount: serverStateRef.current.deck.length,
+        playStack: [...prev.playStack, [drawnCard]]
+      }));
+    };
+
+    const handleHostReturnBatch = (e: Event) => {
+      const customEvent = e as CustomEvent<{ toTop: boolean }>;
+      const { toTop } = customEvent.detail;
+
+      updateStateAndBroadcast(prev => {
+        const newPlayStack = [...prev.playStack];
+        if (newPlayStack.length === 0) return prev;
+
+        const lastBatch = newPlayStack.pop() || [];
+
+        if (toTop) {
+          serverStateRef.current.deck.unshift(...lastBatch);
+        } else {
+          serverStateRef.current.deck.push(...lastBatch);
+        }
+
+        return {
+          ...prev,
+          deckCount: serverStateRef.current.deck.length,
+          playStack: newPlayStack
+        };
+      });
+    };
+
     window.addEventListener('host-deal-card', handleHostDeal);
+    window.addEventListener('host-draw-to-table', handleHostDrawToTable);
+    window.addEventListener('host-return-batch', handleHostReturnBatch);
     return () => {
       window.removeEventListener('host-deal-card', handleHostDeal);
+      window.removeEventListener('host-draw-to-table', handleHostDrawToTable);
+      window.removeEventListener('host-return-batch', handleHostReturnBatch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
