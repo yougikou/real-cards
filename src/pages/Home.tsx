@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function Home() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const message = (location.state as { message?: string })?.message;
+
   const [roomId, setRoomId] = useState('');
   const [playerName, setPlayerName] = useState('');
 
@@ -18,6 +21,12 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+      {message && (
+        <div className="mb-6 p-4 bg-orange-100 border border-orange-400 text-orange-700 rounded-lg shadow-sm w-full max-w-md text-center font-medium">
+          {message}
+        </div>
+      )}
+
       <h1 className="text-4xl font-bold mb-8">Real Cards Sandbox</h1>
 
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
