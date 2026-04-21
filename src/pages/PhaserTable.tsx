@@ -160,7 +160,7 @@ class TableScene extends Phaser.Scene {
         if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
         const defaultText = `Top Seat ${i + 1}`;
-        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5);
+        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px', align: 'center' }).setOrigin(0.5);
 
         this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_top_${i + 1}`, defaultText });
     }
@@ -175,7 +175,7 @@ class TableScene extends Phaser.Scene {
         if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
         const defaultText = `Bottom Seat ${i + 1}`;
-        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5);
+        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px', align: 'center' }).setOrigin(0.5);
 
         this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_bottom_${i + 1}`, defaultText });
     }
@@ -190,7 +190,7 @@ class TableScene extends Phaser.Scene {
         if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
         const defaultText = `Left Seat ${i + 1}`;
-        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5).setRotation(Math.PI / 2);
+        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px', align: 'center' }).setOrigin(0.5).setRotation(Math.PI / 2);
 
         this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_left_${i + 1}`, defaultText });
     }
@@ -205,7 +205,7 @@ class TableScene extends Phaser.Scene {
         if (this.matter) this.matter.add.gameObject(zone, { isStatic: true, isSensor: true });
 
         const defaultText = `Right Seat ${i + 1}`;
-        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px' }).setOrigin(0.5).setRotation(-Math.PI / 2);
+        const text = this.add.text(x, y, defaultText, { color: '#ffffff', fontSize: '16px', align: 'center' }).setOrigin(0.5).setRotation(-Math.PI / 2);
 
         this.playerZones.push({ rect: zone as Phaser.GameObjects.Rectangle, text, zoneId: `player_right_${i + 1}`, defaultText });
     }
@@ -221,14 +221,24 @@ class TableScene extends Phaser.Scene {
       if (player) {
         zone.mappedPlayerId = player.id;
         if (zone.text) {
-          zone.text.setText(`${player.name}\nCards: ${player.handCount}`);
+          zone.text.setText(`📥 DEAL TO:\n${player.name}\nCards: ${player.handCount}`);
           zone.text.setColor('#fbbf24'); // yellow-400
+          zone.text.setFontStyle('bold');
+        }
+        if (zone.rect) {
+          zone.rect.setFillStyle(0x10b981, 0.2); // emerald-500
+          zone.rect.setStrokeStyle(4, 0xfbbf24, 1); // yellow-400
         }
       } else {
         zone.mappedPlayerId = undefined;
         if (zone.text) {
           zone.text.setText(`Empty\n(${zone.defaultText})`);
-          zone.text.setColor('#ffffff');
+          zone.text.setColor('#888888');
+          zone.text.setFontStyle('normal');
+        }
+        if (zone.rect) {
+          zone.rect.setFillStyle(0x000000, 0.1);
+          zone.rect.setStrokeStyle(2, 0xffffff, 0.1);
         }
       }
     }

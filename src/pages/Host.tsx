@@ -159,6 +159,7 @@ export default function Host() {
 
         {/* Navigation Affordance / Controls */}
         <div className="absolute bottom-4 left-4 bg-black/60 border border-white/20 p-3 rounded-lg text-white/90 text-sm flex gap-4 pointer-events-auto backdrop-blur-sm shadow-lg">
+          <span className="flex items-center gap-2 text-yellow-300 font-bold border border-yellow-500/50 bg-yellow-900/30 px-2 py-0.5 rounded">🃏 Drag cards to seats to deal</span>
           <span className="flex items-center gap-2">🖐️ Drag to pan</span>
           <span className="flex items-center gap-2">🔍 Scroll to zoom</span>
           <button
