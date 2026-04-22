@@ -72,6 +72,25 @@ export default function Client() {
     });
   }, [hand, sortMode]);
 
+  const groupedHand = useMemo(() => {
+    if (sortMode === 'draw') return null;
+
+    return displayHand.reduce((acc, card) => {
+      let key = '';
+      if (sortMode === 'suit') {
+        key = card.suit === 'none' ? 'JOKERS' : card.suit.toUpperCase();
+      } else if (sortMode === 'rank') {
+        key = `RANK: ${card.rank}`;
+      }
+
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(card);
+      return acc;
+    }, {} as Record<string, Card[]>);
+  }, [displayHand, sortMode]);
+
   const toggleSelect = (cardId: string) => {
     setSelectedCards(prev =>
       prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]
@@ -99,6 +118,37 @@ export default function Client() {
       const topBatch = gameState.playStack[gameState.playStack.length - 1];
       takeBackCards(topBatch);
     }
+  };
+
+  const renderCard = (card: Card) => {
+    const isSelected = selectedCards.includes(card.id);
+    const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
+
+    return (
+      <div
+        key={card.id}
+        onClick={() => toggleSelect(card.id)}
+        className={`
+          relative aspect-[2/3] bg-white rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200
+          ${isSelected ? 'ring-4 ring-blue-500 -translate-y-2' : 'hover:-translate-y-1'}
+        `}
+      >
+        {isSelected && (
+          <div className="absolute top-1 right-1 bg-blue-500 rounded-full w-5 h-5 flex items-center justify-center text-xs text-white z-10">
+            ✓
+          </div>
+        )}
+        <div className={`text-lg font-bold ${color}`}>{card.rank}</div>
+        <div className={`text-3xl self-center ${color}`}>
+          {card.suit === 'hearts' && '♥'}
+          {card.suit === 'diamonds' && '♦'}
+          {card.suit === 'clubs' && '♣'}
+          {card.suit === 'spades' && '♠'}
+          {card.suit === 'none' && '🃏'}
+        </div>
+        <div className={`text-lg font-bold rotate-180 ${color}`}>{card.rank}</div>
+      </div>
+    );
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -297,38 +347,22 @@ export default function Client() {
         </div>
 
         <div className="flex-grow overflow-y-auto pr-2 pb-4">
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-            {displayHand.map((card: Card) => {
-              const isSelected = selectedCards.includes(card.id);
-              const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
-
-              return (
-                <div
-                  key={card.id}
-                  onClick={() => toggleSelect(card.id)}
-                  className={`
-                    relative aspect-[2/3] bg-white rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200
-                    ${isSelected ? 'ring-4 ring-blue-500 -translate-y-2' : 'hover:-translate-y-1'}
-                  `}
-                >
-                  {isSelected && (
-                    <div className="absolute top-1 right-1 bg-blue-500 rounded-full w-5 h-5 flex items-center justify-center text-xs text-white z-10">
-                      ✓
-                    </div>
-                  )}
-                  <div className={`text-lg font-bold ${color}`}>{card.rank}</div>
-                  <div className={`text-3xl self-center ${color}`}>
-                    {card.suit === 'hearts' && '♥'}
-                    {card.suit === 'diamonds' && '♦'}
-                    {card.suit === 'clubs' && '♣'}
-                    {card.suit === 'spades' && '♠'}
-                    {card.suit === 'none' && '🃏'}
-                  </div>
-                  <div className={`text-lg font-bold rotate-180 ${color}`}>{card.rank}</div>
+          {sortMode === 'draw' ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              {displayHand.map(renderCard)}
+            </div>
+          ) : (
+            groupedHand && Object.entries(groupedHand).map(([groupName, cards]) => (
+              <div key={groupName} className="mb-6">
+                <div className="text-xs font-bold text-gray-500 mb-2 border-b border-gray-700 pb-1 uppercase tracking-wider">
+                  {groupName} ({cards.length})
                 </div>
-              );
-            })}
-          </div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {cards.map(renderCard)}
+                </div>
+              </div>
+            ))
+          )}
           {hand.length === 0 && (
             <div className="h-full flex items-center justify-center text-gray-500 mt-10">
               No cards in hand. Swipe down to draw!
