@@ -163,16 +163,27 @@ export default function Client() {
 
     return (
       <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
-        <button
-          onClick={() => setViewOther(null)}
-          className="mb-4 text-blue-400 font-bold"
-        >
-          ← Back to Hand
-        </button>
+        <div className="flex items-center mb-6">
+          <button
+            onClick={() => setViewOther(null)}
+            className="text-blue-400 font-bold flex items-center gap-1 bg-gray-800 px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            ← Back
+          </button>
+          <div className="flex-1 text-center font-bold text-lg mr-12 text-gray-300">
+            Inspection Mode
+          </div>
+        </div>
 
-        <h2 className="text-2xl font-bold mb-8 text-center">{targetPlayer.name}'s Hand</h2>
+        <div className="bg-blue-900/40 border border-blue-500/50 rounded-xl p-4 mb-8 text-center">
+          <h2 className="text-2xl font-black text-white mb-2">{targetPlayer.name}'s Hidden Hand</h2>
+          <p className="text-sm text-blue-200">
+            You are secretly viewing this player's cards.<br/>
+            <span className="font-bold text-yellow-400">Tap a card to steal it into your hand!</span>
+          </p>
+        </div>
 
-        <div className="grid grid-cols-4 gap-4 flex-grow content-start">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 flex-grow content-start">
           {Array.from({ length: targetPlayer.handCount }).map((_, i) => (
             <div
               key={i}
@@ -184,14 +195,19 @@ export default function Client() {
                 drawFromOther(viewOther, '');
                 setViewOther(null);
               }}
-              className="aspect-[2/3] bg-blue-800 rounded-lg border-2 border-white/20 flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors"
+              className="group relative aspect-[2/3] bg-blue-800 rounded-lg border-2 border-white/20 flex items-center justify-center cursor-pointer hover:bg-blue-600 hover:border-yellow-400 hover:-translate-y-1 transition-all shadow-md overflow-hidden"
             >
-              <div className="text-white/30 font-black text-2xl">?</div>
+              <div className="text-white/30 font-black text-3xl group-hover:opacity-0 transition-opacity">?</div>
+              <div className="absolute inset-0 bg-yellow-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="bg-yellow-500 text-gray-900 font-bold text-xs uppercase px-2 py-1 rounded shadow-lg transform -rotate-12">
+                  Steal
+                </span>
+              </div>
             </div>
           ))}
           {targetPlayer.handCount === 0 && (
-            <div className="col-span-4 text-center text-gray-500 mt-10">
-              No cards in hand.
+            <div className="col-span-3 sm:col-span-4 text-center text-gray-500 mt-10">
+              No cards in hand to steal.
             </div>
           )}
         </div>
@@ -372,7 +388,7 @@ export default function Client() {
       {/* Other Players Area */}
       {gameState && Object.keys(gameState.players).length > 1 && (
         <div className="mt-4 pt-4 border-t border-gray-800">
-          <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players</h2>
+          <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players (Tap to Inspect)</h2>
           <div className="flex overflow-x-auto gap-3 pb-2">
             {Object.values(gameState.players).map(p => {
               if (p.id === peerId) return null;
@@ -381,10 +397,15 @@ export default function Client() {
                 <div
                   key={p.id}
                   onClick={() => setViewOther(p.id)}
-                  className="flex-shrink-0 bg-gray-800 rounded-lg p-3 w-32 cursor-pointer hover:bg-gray-700 active:scale-95 transition-all"
+                  className="flex-shrink-0 bg-gray-800 border border-gray-700 rounded-lg p-3 w-32 cursor-pointer hover:bg-gray-700 hover:border-blue-500 active:scale-95 transition-all flex flex-col justify-between group"
                 >
-                  <div className="font-bold truncate text-sm">{p.name}</div>
-                  <div className="text-xs text-gray-400 mt-1">{p.handCount} cards</div>
+                  <div>
+                    <div className="font-bold truncate text-sm text-white group-hover:text-blue-400 transition-colors">{p.name}</div>
+                    <div className="text-xs text-gray-400 mt-1">{p.handCount} cards</div>
+                  </div>
+                  <div className="text-xs text-blue-500 mt-2 font-semibold uppercase tracking-widest opacity-80 group-hover:opacity-100 flex items-center gap-1">
+                    <span>👁 Inspect</span>
+                  </div>
                 </div>
               );
             })}
