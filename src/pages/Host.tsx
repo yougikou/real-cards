@@ -114,18 +114,18 @@ export default function Host() {
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent('host-return-batch', { detail: { toTop: true } }));
                           }}
-                          className="bg-black/80 hover:bg-black text-white text-[10px] px-2 py-0.5 rounded border border-white/30 transition-colors"
+                          className="bg-black/80 hover:bg-black text-white text-[10px] px-2 py-0.5 rounded border border-white/30 transition-colors whitespace-nowrap"
                         >
-                          ↑ To Top
+                          ↑ Return to Deck Top
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent('host-return-batch', { detail: { toTop: false } }));
                           }}
-                          className="bg-black/80 hover:bg-black text-white text-[10px] px-2 py-0.5 rounded border border-white/30 transition-colors"
+                          className="bg-black/80 hover:bg-black text-white text-[10px] px-2 py-0.5 rounded border border-white/30 transition-colors whitespace-nowrap"
                         >
-                          ↓ To Bottom
+                          ↓ Return to Deck Bottom
                         </button>
                       </div>
                     </div>
@@ -158,6 +158,16 @@ export default function Host() {
             {gameState.playStack.length === 0 && (
               <div className="text-white/20 font-bold text-2xl uppercase tracking-widest border-2 border-dashed border-white/20 p-8 rounded-xl">
                 Play Area
+              </div>
+            )}
+            {gameState.playStack.length > 0 && (
+              <div className="absolute -bottom-8 text-center z-10 pointer-events-none">
+                <div className="text-white/50 font-bold text-sm uppercase tracking-widest">
+                  Public Play History
+                </div>
+                <div className="text-white/40 text-xs font-medium mt-1">
+                  {gameState.playStack.reduce((acc, batch) => acc + batch.length, 0)} cards in stack
+                </div>
               </div>
             )}
           </div>
