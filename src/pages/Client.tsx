@@ -193,26 +193,28 @@ export default function Client() {
         </div>
         <div className="flex justify-between items-end">
           {sortMode === 'free' && index !== -1 ? (
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               <button
                 onClick={(e) => moveCard(e, index, 'left')}
                 disabled={index === 0}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded px-2 py-1 text-xs font-bold disabled:opacity-50"
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 rounded px-1.5 py-1 text-[10px] font-bold disabled:opacity-30 flex items-center shadow-sm"
+                title="Move Left"
               >
-                &lt;
+                ◀ L
               </button>
               <button
                 onClick={(e) => moveCard(e, index, 'right')}
                 disabled={index === customOrder.length - 1}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded px-2 py-1 text-xs font-bold disabled:opacity-50"
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 rounded px-1.5 py-1 text-[10px] font-bold disabled:opacity-30 flex items-center shadow-sm"
+                title="Move Right"
               >
-                &gt;
+                R ▶
               </button>
             </div>
           ) : (
             <div />
           )}
-          <div className={`text-lg font-bold rotate-180 ${color}`}>{card.rank}</div>
+          <div className={`text-lg font-bold rotate-180 ${color} ml-1`}>{card.rank}</div>
         </div>
       </div>
     );
@@ -431,6 +433,11 @@ export default function Client() {
               FREE
             </button>
           </div>
+          {sortMode === 'free' && (
+            <div className="text-[10px] text-gray-400 mt-1.5 italic">
+              Use the ◀ L / R ▶ buttons on each card to arrange your hand.
+            </div>
+          )}
         </div>
 
         <div className="flex-grow overflow-y-auto pr-2 pb-4">

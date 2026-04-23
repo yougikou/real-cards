@@ -19,6 +19,10 @@ export default function Home() {
     }
   };
 
+  const handlePreviewMode = () => {
+    navigate('/client/preview_room?name=Previewer&preview=true');
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
       {message && (
@@ -84,6 +88,19 @@ export default function Home() {
               Join (Phone)
             </button>
           </div>
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <h2 className="text-xl font-semibold mb-4 text-center text-gray-700">Explore UI</h2>
+          <button
+            onClick={handlePreviewMode}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition-colors shadow-sm"
+          >
+            Try Client Preview Mode
+          </button>
+          <p className="text-xs text-gray-500 text-center mt-2">
+            Test the hand UI locally without needing a Host connection.
+          </p>
         </div>
       </div>
     </div>
