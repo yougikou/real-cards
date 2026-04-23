@@ -30,17 +30,28 @@ const RANK_ORDER: Record<Rank, number> = {
 
 type SortMode = 'draw' | 'suit' | 'rank';
 
+const MOCK_HAND: Card[] = [
+  { id: 'mock-1', suit: 'spades', rank: 'A' },
+  { id: 'mock-2', suit: 'hearts', rank: 'K' },
+  { id: 'mock-3', suit: 'spades', rank: '2' },
+  { id: 'mock-4', suit: 'diamonds', rank: '10' },
+  { id: 'mock-5', suit: 'clubs', rank: 'A' },
+  { id: 'mock-6', suit: 'hearts', rank: '10' },
+  { id: 'mock-7', suit: 'none', rank: 'JOKER' },
+];
+
 export default function Client() {
   const { hostId } = useParams<{ hostId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const playerName = searchParams.get('name') || 'Player';
+  const isPreview = searchParams.get('preview') === 'true';
 
   const {
-    status,
+    status: realStatus,
     error,
     retry,
     gameState,
-    hand,
+    hand: realHand,
     peerId,
     drawCard,
     playCards,
@@ -48,6 +59,9 @@ export default function Client() {
     takeBackCards,
     drawFromOther
   } = useClient(hostId!, playerName);
+
+  const status = isPreview ? 'connected' : realStatus;
+  const hand = isPreview ? MOCK_HAND : realHand;
 
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [viewOther, setViewOther] = useState<string | null>(null);
@@ -202,6 +216,12 @@ export default function Client() {
             <div className="text-gray-400">Room ID: {hostId}</div>
           </div>
         )}
+        <button
+          onClick={() => setSearchParams((prev) => { prev.set('preview', 'true'); return prev; })}
+          className="mt-8 text-sm text-gray-500 underline hover:text-white transition-colors"
+        >
+          Enter UI Preview Mode
+        </button>
       </div>
     );
   }
