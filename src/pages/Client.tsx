@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useClient } from '../hooks/useClient';
 import type { Card, Suit, Rank } from '../types';
@@ -28,7 +28,7 @@ const RANK_ORDER: Record<Rank, number> = {
   '3': 14,
 };
 
-type SortMode = 'draw' | 'suit' | 'rank';
+type SortMode = 'draw' | 'suit' | 'rank' | 'free';
 
 const MOCK_HAND: Card[] = [
   { id: 'mock-1', suit: 'spades', rank: 'A' },
@@ -70,9 +70,27 @@ export default function Client() {
   const [touchStartY, setTouchStartY] = useState(0);
 
   const [sortMode, setSortMode] = useState<SortMode>('draw');
+  const [customOrder, setCustomOrder] = useState<string[]>([]);
+
+  // Update custom order when hand changes but do not cause cascading renders
+  React.useEffect(() => {
+    setCustomOrder(prev => {
+      const newOrder = prev.filter(id => hand.some(c => c.id === id));
+      const missingIds = hand.filter(c => !newOrder.includes(c.id)).map(c => c.id);
+      if (newOrder.length === prev.length && missingIds.length === 0) {
+         return prev; // no changes
+      }
+      return [...newOrder, ...missingIds];
+    });
+  }, [hand]);
 
   const displayHand = useMemo(() => {
     if (sortMode === 'draw') return hand;
+
+    if (sortMode === 'free') {
+      return customOrder.map(id => hand.find(c => c.id === id)).filter(Boolean) as Card[];
+    }
+
     return [...hand].sort((a, b) => {
       if (sortMode === 'suit') {
         const suitDiff = SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
@@ -84,10 +102,10 @@ export default function Client() {
         return SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
       }
     });
-  }, [hand, sortMode]);
+  }, [hand, sortMode, customOrder]);
 
   const groupedHand = useMemo(() => {
-    if (sortMode === 'draw') return null;
+    if (sortMode === 'draw' || sortMode === 'free') return null;
 
     return displayHand.reduce((acc, card) => {
       let key = '';
@@ -109,6 +127,19 @@ export default function Client() {
     setSelectedCards(prev =>
       prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]
     );
+  };
+
+  const moveCard = (e: React.MouseEvent, index: number, direction: 'left' | 'right') => {
+    e.stopPropagation();
+    setCustomOrder(prev => {
+      const newOrder = [...prev];
+      if (direction === 'left' && index > 0) {
+        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+      } else if (direction === 'right' && index < newOrder.length - 1) {
+        [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
+      }
+      return newOrder;
+    });
   };
 
   const handlePlaySelected = () => {
@@ -134,7 +165,7 @@ export default function Client() {
     }
   };
 
-  const renderCard = (card: Card) => {
+  const renderCard = (card: Card, index: number = -1) => {
     const isSelected = selectedCards.includes(card.id);
     const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
 
@@ -160,7 +191,29 @@ export default function Client() {
           {card.suit === 'spades' && '♠'}
           {card.suit === 'none' && '🃏'}
         </div>
-        <div className={`text-lg font-bold rotate-180 ${color}`}>{card.rank}</div>
+        <div className="flex justify-between items-end">
+          {sortMode === 'free' && index !== -1 ? (
+            <div className="flex gap-2">
+              <button
+                onClick={(e) => moveCard(e, index, 'left')}
+                disabled={index === 0}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded px-2 py-1 text-xs font-bold disabled:opacity-50"
+              >
+                &lt;
+              </button>
+              <button
+                onClick={(e) => moveCard(e, index, 'right')}
+                disabled={index === customOrder.length - 1}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded px-2 py-1 text-xs font-bold disabled:opacity-50"
+              >
+                &gt;
+              </button>
+            </div>
+          ) : (
+            <div />
+          )}
+          <div className={`text-lg font-bold rotate-180 ${color}`}>{card.rank}</div>
+        </div>
       </div>
     );
   };
@@ -216,12 +269,20 @@ export default function Client() {
             <div className="text-gray-400">Room ID: {hostId}</div>
           </div>
         )}
-        <button
-          onClick={() => setSearchParams((prev) => { prev.set('preview', 'true'); return prev; })}
-          className="mt-8 text-sm text-gray-500 underline hover:text-white transition-colors"
-        >
-          Enter UI Preview Mode
-        </button>
+        <div className="mt-12 w-full max-w-sm">
+          <div className="bg-gray-800/80 p-4 rounded-xl border border-gray-700/50 text-center shadow-lg">
+            <div className="text-gray-300 font-bold mb-2">Want to look around without a host?</div>
+            <p className="text-xs text-gray-400 mb-4">
+              Explore the Client interface, test gestures, and organize a mock hand offline.
+            </p>
+            <button
+              onClick={() => setSearchParams((prev) => { prev.set('preview', 'true'); return prev; })}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded shadow active:scale-95 transition-all"
+            >
+              Enter UI Preview Mode
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -344,7 +405,7 @@ export default function Client() {
             )}
           </h2>
           <div className="flex gap-2">
-            <span className="text-xs text-gray-400 self-center uppercase tracking-wider font-bold">Sort:</span>
+            <span className="text-xs text-gray-400 self-center uppercase tracking-wider font-bold">Sort (Local Only):</span>
             <button
               onClick={() => setSortMode('draw')}
               className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'draw' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
@@ -363,13 +424,19 @@ export default function Client() {
             >
               RANK
             </button>
+            <button
+              onClick={() => setSortMode('free')}
+              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'free' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            >
+              FREE
+            </button>
           </div>
         </div>
 
         <div className="flex-grow overflow-y-auto pr-2 pb-4">
-          {sortMode === 'draw' ? (
+          {sortMode === 'draw' || sortMode === 'free' ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              {displayHand.map(renderCard)}
+              {displayHand.map((card, idx) => renderCard(card, idx))}
             </div>
           ) : (
             groupedHand && Object.entries(groupedHand).map(([groupName, cards]) => (
@@ -378,7 +445,7 @@ export default function Client() {
                   {groupName} ({cards.length})
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {cards.map(renderCard)}
+                  {cards.map((card, idx) => renderCard(card, idx))}
                 </div>
               </div>
             ))
