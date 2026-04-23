@@ -40,6 +40,23 @@ const MOCK_HAND: Card[] = [
   { id: 'mock-7', suit: 'none', rank: 'JOKER' },
 ];
 
+import type { GameState } from '../types';
+
+const MOCK_GAME_STATE: GameState = {
+  deckCount: 42,
+  discardPile: [],
+  playStack: [
+    [
+      { id: 'mock-history-1', suit: 'hearts', rank: '3' },
+      { id: 'mock-history-2', suit: 'diamonds', rank: '3' }
+    ]
+  ],
+  players: {
+    'mock-peer-1': { id: 'mock-peer-1', name: 'Alice', handCount: 5 },
+    'mock-peer-2': { id: 'mock-peer-2', name: 'Bob', handCount: 3 }
+  }
+};
+
 export default function Client() {
   const { hostId } = useParams<{ hostId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -50,7 +67,7 @@ export default function Client() {
     status: realStatus,
     error,
     retry,
-    gameState,
+    gameState: realGameState,
     hand: realHand,
     peerId,
     drawCard,
@@ -60,8 +77,12 @@ export default function Client() {
     drawFromOther
   } = useClient(hostId!, playerName);
 
+  const [localHand, setLocalHand] = useState<Card[]>(MOCK_HAND);
+  const [localGameState, setLocalGameState] = useState<GameState>(MOCK_GAME_STATE);
+
   const status = isPreview ? 'connected' : realStatus;
-  const hand = isPreview ? MOCK_HAND : realHand;
+  const hand = isPreview ? localHand : realHand;
+  const activeGameState = isPreview ? localGameState : realGameState;
 
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [viewOther, setViewOther] = useState<string | null>(null);
@@ -145,7 +166,15 @@ export default function Client() {
   const handlePlaySelected = () => {
     const cardsToPlay = displayHand.filter(c => selectedCards.includes(c.id));
     if (cardsToPlay.length > 0) {
-      playCards(cardsToPlay);
+      if (isPreview) {
+        setLocalHand(prev => prev.filter(c => !cardsToPlay.map(sc => sc.id).includes(c.id)));
+        setLocalGameState(prev => ({
+          ...prev,
+          playStack: [...prev.playStack, cardsToPlay]
+        }));
+      } else {
+        playCards(cardsToPlay);
+      }
       setSelectedCards([]);
     }
   };
@@ -153,15 +182,27 @@ export default function Client() {
   const handleReturnSelected = (toTop: boolean) => {
     const cardsToReturn = displayHand.filter(c => selectedCards.includes(c.id));
     if (cardsToReturn.length > 0) {
-      returnCards(cardsToReturn, toTop);
+      if (isPreview) {
+        setLocalHand(prev => prev.filter(c => !cardsToReturn.map(sc => sc.id).includes(c.id)));
+      } else {
+        returnCards(cardsToReturn, toTop);
+      }
       setSelectedCards([]);
     }
   };
 
   const handleTakeBack = () => {
-    if (gameState && gameState.playStack.length > 0) {
-      const topBatch = gameState.playStack[gameState.playStack.length - 1];
-      takeBackCards(topBatch);
+    if (activeGameState && activeGameState.playStack.length > 0) {
+      const topBatch = activeGameState.playStack[activeGameState.playStack.length - 1];
+      if (isPreview) {
+        setLocalGameState(prev => ({
+          ...prev,
+          playStack: prev.playStack.slice(0, -1)
+        }));
+        setLocalHand(prev => [...prev, ...topBatch]);
+      } else {
+        takeBackCards(topBatch);
+      }
     }
   };
 
@@ -243,7 +284,12 @@ export default function Client() {
       if (selectedCards.length > 0) {
         handleReturnSelected(toTop);
       } else {
-        drawCard(1);
+        if (isPreview) {
+          const newCard: Card = { id: `mock-drawn-${Date.now()}`, suit: 'spades', rank: '7' };
+          setLocalHand(prev => [...prev, newCard]);
+        } else {
+          drawCard(1);
+        }
       }
     }
   };
@@ -290,7 +336,7 @@ export default function Client() {
   }
 
   // Draw From Other Mode
-  const targetPlayer = viewOther && gameState ? gameState.players[viewOther] : null;
+  const targetPlayer = viewOther && activeGameState ? activeGameState.players[viewOther] : null;
 
   if (viewOther && targetPlayer) {
 
@@ -361,34 +407,45 @@ export default function Client() {
         </span>
       </div>
 
-      {gameState && gameState.playStack.length > 0 && (
-        <div className="mb-4 bg-gray-800 rounded-xl p-3 border border-gray-700 flex flex-col">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Latest Play (Top of Stack)</span>
-            <button
-              onClick={handleTakeBack}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors active:scale-95 shadow-md"
-            >
-              TAKE BACK (Undo)
-            </button>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {gameState.playStack[gameState.playStack.length - 1].map((card: Card) => {
-              const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
-              return (
-                <div key={card.id} className="w-12 h-16 bg-white rounded shadow flex flex-col justify-between p-1 flex-shrink-0">
-                  <div className={`text-xs font-bold leading-none ${color}`}>{card.rank}</div>
-                  <div className={`text-lg self-center leading-none ${color}`}>
-                    {card.suit === 'hearts' && '♥'}
-                    {card.suit === 'diamonds' && '♦'}
-                    {card.suit === 'clubs' && '♣'}
-                    {card.suit === 'spades' && '♠'}
-                    {card.suit === 'none' && '🃏'}
-                  </div>
+      {activeGameState && activeGameState.playStack.length > 0 && (
+        <div className="mb-4 flex flex-col gap-2">
+          {activeGameState.playStack.slice(-2).reverse().map((batch, idx) => {
+            const isTopBatch = idx === 0;
+            return (
+              <div key={idx} className={`bg-gray-800 rounded-xl p-3 border border-gray-700 flex flex-col ${isTopBatch ? '' : 'opacity-50 grayscale-[50%]'}`}>
+                <div className="flex justify-between items-center mb-2">
+                  <span className={`text-xs font-bold uppercase tracking-wider ${isTopBatch ? 'text-yellow-500' : 'text-gray-500'}`}>
+                    {isTopBatch ? 'Latest Play (Top of Stack)' : 'Previous Play'}
+                  </span>
+                  {isTopBatch && (
+                    <button
+                      onClick={handleTakeBack}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors active:scale-95 shadow-md"
+                    >
+                      TAKE BACK (Undo)
+                    </button>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {batch.map((card: Card) => {
+                    const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
+                    return (
+                      <div key={card.id} className="w-12 h-16 bg-white rounded shadow flex flex-col justify-between p-1 flex-shrink-0">
+                        <div className={`text-xs font-bold leading-none ${color}`}>{card.rank}</div>
+                        <div className={`text-lg self-center leading-none ${color}`}>
+                          {card.suit === 'hearts' && '♥'}
+                          {card.suit === 'diamonds' && '♦'}
+                          {card.suit === 'clubs' && '♣'}
+                          {card.suit === 'spades' && '♠'}
+                          {card.suit === 'none' && '🃏'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -514,11 +571,11 @@ export default function Client() {
       )}
 
       {/* Other Players Area */}
-      {gameState && Object.keys(gameState.players).length > 1 && (
+      {activeGameState && Object.keys(activeGameState.players).length > 1 && (
         <div className="mt-4 pt-4 border-t border-gray-800">
           <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players (Tap to Inspect)</h2>
           <div className="flex overflow-x-auto gap-3 pb-2">
-            {Object.values(gameState.players).map(p => {
+            {Object.values(activeGameState.players).map(p => {
               if (p.id === peerId) return null;
 
               return (
