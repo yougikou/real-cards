@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const message = (location.state as { message?: string })?.message;
+
+  useEffect(() => {
+    const windowSearch = new URLSearchParams(window.location.search);
+    const hashSearch = new URLSearchParams(location.search);
+    if (windowSearch.get('preview') === 'true' || hashSearch.get('preview') === 'true') {
+      navigate('/client/preview_room?name=Previewer&preview=true', { replace: true });
+    }
+  }, [location, navigate]);
 
   const [roomId, setRoomId] = useState('');
   const [playerName, setPlayerName] = useState('');
