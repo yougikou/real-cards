@@ -161,19 +161,49 @@ export default function Host() {
               </div>
             )}
             {gameState.playStack.length > 0 && (
-              <div className="absolute -bottom-8 text-center z-10 pointer-events-none">
+              <div className="absolute -bottom-16 text-center z-10 pointer-events-none flex flex-col items-center">
                 <div className="text-white/50 font-bold text-sm uppercase tracking-widest">
                   Public Play History
                 </div>
-                <div className="text-white/40 text-xs font-medium mt-1">
+                <div className="text-white/40 text-xs font-medium mt-1 mb-2">
                   {gameState.playStack.reduce((acc, batch) => acc + batch.length, 0)} cards in stack
                 </div>
+                <button
+                  onClick={() => window.dispatchEvent(new Event('host-clear-table'))}
+                  className="pointer-events-auto bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-1.5 rounded-full border border-gray-600 text-xs uppercase tracking-wider font-bold transition-colors shadow-lg active:scale-95"
+                >
+                  Clear to Discard ↓
+                </button>
               </div>
             )}
           </div>
         </div>
 
         <div className="absolute top-4 right-4 flex gap-4 pointer-events-auto">
+          {/* Discard Pile */}
+          <div
+            className={`w-32 h-48 bg-gray-800 rounded-xl shadow-lg border-2 border-gray-600 flex flex-col items-center justify-center transition-opacity ${gameState.discardPile.length > 0 ? 'opacity-100' : 'opacity-50'}`}
+          >
+            <div className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-widest">Discard</div>
+            <div className="text-2xl font-black text-gray-500">{gameState.discardPile.length}</div>
+
+            {gameState.discardPile.length > 0 && (
+              <div className="mt-3 bg-white w-16 h-20 rounded shadow flex flex-col items-center justify-center p-1 transform rotate-6">
+                <span className={`text-sm font-bold ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
+                  {gameState.discardPile[gameState.discardPile.length - 1].rank}
+                </span>
+                <span className={`text-xl ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
+                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' && '♥'}
+                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' && '♦'}
+                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'clubs' && '♣'}
+                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'spades' && '♠'}
+                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'none' && '🃏'}
+                </span>
+              </div>
+            )}
+            {gameState.discardPile.length === 0 && <div className="text-gray-600 text-xs mt-2">(Empty)</div>}
+          </div>
+
           {/* Deck */}
           <div
             onClick={() => {

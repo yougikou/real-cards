@@ -6,7 +6,7 @@ def run():
         browser = p.chromium.launch()
         page = browser.new_page()
         # Navigate to the preview URL with the base path
-        app_url = os.environ.get("APP_URL", "http://localhost:4173/real-cards/")
+        app_url = os.environ.get("APP_URL", "http://localhost:4173/?preview=true")
         page.goto(app_url)
         # Wait for the app to load by checking for some text or element
         page.wait_for_selector("#root", state="attached")
