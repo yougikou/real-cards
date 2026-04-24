@@ -416,6 +416,26 @@ export default function Client() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
+      {/* Read-Only Table Info Banner */}
+      {activeGameState && (
+        <div className="flex justify-between items-center bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+          <div>Deck: <span className="text-white">{activeGameState.deckCount}</span></div>
+          <div className="flex items-center gap-1">
+            Discard: <span className="text-white">{activeGameState.discardPile.length}</span>
+            {activeGameState.discardPile.length > 0 && (
+              <span className={`px-1 py-0.5 rounded ml-1 bg-white leading-none flex items-center ${activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'hearts' || activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
+                {activeGameState.discardPile[activeGameState.discardPile.length - 1].rank}
+                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'hearts' && '♥'}
+                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'diamonds' && '♦'}
+                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'clubs' && '♣'}
+                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'spades' && '♠'}
+                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'none' && '🃏'}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top Play/Take Back Zone Indicator */}
       <div
         className="h-24 border-2 border-dashed border-gray-700 rounded-xl flex items-center justify-center mb-4 bg-gray-800/50 cursor-pointer"

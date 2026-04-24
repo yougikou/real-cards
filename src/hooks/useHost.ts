@@ -305,13 +305,29 @@ export function useHost() {
       });
     };
 
+    const handleHostClearTable = () => {
+      updateStateAndBroadcast(prev => {
+        if (prev.playStack.length === 0) return prev;
+
+        const flattenedStack = prev.playStack.flat();
+
+        return {
+          ...prev,
+          playStack: [],
+          discardPile: [...prev.discardPile, ...flattenedStack]
+        };
+      });
+    };
+
     window.addEventListener('host-deal-card', handleHostDeal);
     window.addEventListener('host-draw-to-table', handleHostDrawToTable);
     window.addEventListener('host-return-batch', handleHostReturnBatch);
+    window.addEventListener('host-clear-table', handleHostClearTable);
     return () => {
       window.removeEventListener('host-deal-card', handleHostDeal);
       window.removeEventListener('host-draw-to-table', handleHostDrawToTable);
       window.removeEventListener('host-return-batch', handleHostReturnBatch);
+      window.removeEventListener('host-clear-table', handleHostClearTable);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
