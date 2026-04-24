@@ -160,22 +160,29 @@ export default function Host() {
                 Play Area
               </div>
             )}
-            {gameState.playStack.length > 0 && (
-              <div className="absolute -bottom-16 text-center z-10 pointer-events-none flex flex-col items-center">
-                <div className="text-white/50 font-bold text-sm uppercase tracking-widest">
-                  Public Play History
-                </div>
-                <div className="text-white/40 text-xs font-medium mt-1 mb-2">
-                  {gameState.playStack.reduce((acc, batch) => acc + batch.length, 0)} cards in stack
-                </div>
+            <div className="absolute -bottom-16 text-center z-10 pointer-events-none flex flex-col items-center">
+              <div className="text-white/50 font-bold text-sm uppercase tracking-widest">
+                Public Play History
+              </div>
+              <div className="text-white/40 text-xs font-medium mt-1 mb-2">
+                {gameState.playStack.reduce((acc, batch) => acc + batch.length, 0)} cards in stack
+              </div>
+              {gameState.playStack.length > 0 ? (
                 <button
                   onClick={() => window.dispatchEvent(new Event('host-clear-table'))}
                   className="pointer-events-auto bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-1.5 rounded-full border border-gray-600 text-xs uppercase tracking-wider font-bold transition-colors shadow-lg active:scale-95"
                 >
                   Clear to Discard ↓
                 </button>
-              </div>
-            )}
+              ) : (
+                <button
+                  disabled
+                  className="pointer-events-auto bg-gray-800/50 text-gray-500 px-4 py-1.5 rounded-full border border-gray-600/50 text-xs uppercase tracking-wider font-bold cursor-not-allowed shadow-none"
+                >
+                  Play Area Empty
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
