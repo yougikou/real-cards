@@ -47,6 +47,9 @@ const MOCK_GAME_STATE: GameState = {
   discardPile: [],
   playStack: [
     [
+      { id: 'mock-history-0', suit: 'spades', rank: '2' }
+    ],
+    [
       { id: 'mock-history-1', suit: 'hearts', rank: '3' },
       { id: 'mock-history-2', suit: 'diamonds', rank: '3' }
     ]
@@ -184,6 +187,11 @@ export default function Client() {
     if (cardsToReturn.length > 0) {
       if (isPreview) {
         setLocalHand(prev => prev.filter(c => !cardsToReturn.map(sc => sc.id).includes(c.id)));
+        setLocalGameState(prev => ({
+          ...prev,
+          deckCount: prev.deckCount + cardsToReturn.length
+        }));
+        window.alert(`Mock: ${cardsToReturn.length} card(s) returned to ${toTop ? 'TOP' : 'BOTTOM'} of deck.`);
       } else {
         returnCards(cardsToReturn, toTop);
       }
@@ -367,11 +375,23 @@ export default function Client() {
             <div
               key={i}
               onClick={() => {
-                // In a real app we'd need to know the hidden card ID,
-                // but since we only have count on client, we need a way for host to pick random.
-                // For simplicity in this demo, since client doesn't have IDs of other's cards,
-                // let's pass an empty string and let Host pick a random one if ID is empty.
-                drawFromOther(viewOther, '');
+                if (isPreview) {
+                  const newCard: Card = { id: `mock-stolen-${Date.now()}`, suit: 'none', rank: 'JOKER' };
+                  setLocalHand(prev => [...prev, newCard]);
+                  setLocalGameState(prev => {
+                    const newPlayers = { ...prev.players };
+                    if (newPlayers[viewOther]) {
+                      newPlayers[viewOther] = { ...newPlayers[viewOther], handCount: Math.max(0, newPlayers[viewOther].handCount - 1) };
+                    }
+                    return { ...prev, players: newPlayers };
+                  });
+                } else {
+                  // In a real app we'd need to know the hidden card ID,
+                  // but since we only have count on client, we need a way for host to pick random.
+                  // For simplicity in this demo, since client doesn't have IDs of other's cards,
+                  // let's pass an empty string and let Host pick a random one if ID is empty.
+                  drawFromOther(viewOther, '');
+                }
                 setViewOther(null);
               }}
               className="group relative aspect-[2/3] bg-blue-800 rounded-lg border-2 border-white/20 flex items-center justify-center cursor-pointer hover:bg-blue-600 hover:border-yellow-400 hover:-translate-y-1 transition-all shadow-md overflow-hidden"
