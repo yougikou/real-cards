@@ -448,16 +448,37 @@ export default function Client() {
         </div>
       )}
 
-      {/* Top Play/Take Back Zone Indicator */}
-      <div
-        className="h-24 border-2 border-dashed border-gray-700 rounded-xl flex items-center justify-center mb-4 bg-gray-800/50 cursor-pointer"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleSwipeUpPlay}
-      >
-        <span className="text-gray-500 font-bold uppercase tracking-widest text-center pointer-events-none">
-          {selectedCards.length > 0 ? `↑ Swipe up to PLAY (${selectedCards.length})` : 'Play Zone (Select cards first)'}
-        </span>
-      </div>
+      {/* Top Play Zone Indicator */}
+      {selectedCards.length === 0 ? (
+        <div
+          className="min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center mb-4 bg-gray-800/50 cursor-pointer px-3 py-3"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleSwipeUpPlay}
+        >
+          <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none mb-1">
+            Play Zone
+          </span>
+          <span className="text-gray-600 text-xs text-center pointer-events-none">
+            Select cards from your hand to play
+          </span>
+        </div>
+      ) : (
+        <div
+          className="min-h-20 border-2 border-dashed border-green-600 rounded-xl flex flex-col items-center justify-center mb-4 bg-green-900/30 cursor-pointer px-3 py-3"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleSwipeUpPlay}
+        >
+          <button
+            onClick={handlePlaySelected}
+            className="rounded-lg bg-green-600 px-6 py-3 text-lg font-bold text-white transition-colors hover:bg-green-700 active:scale-95 shadow-lg mb-1 pointer-events-auto"
+          >
+            PLAY {selectedCards.length} CARD{selectedCards.length > 1 ? 'S' : ''}
+          </button>
+          <span className="text-green-400 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
+            ↑ (OR SWIPE UP)
+          </span>
+        </div>
+      )}
 
       {activeGameState && activeGameState.playStack.length > 0 && (
         <div className="mb-4 flex flex-col gap-2">
