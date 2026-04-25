@@ -509,7 +509,7 @@ export default function Client() {
               onClick={() => setSortMode('draw')}
               className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'draw' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
             >
-              DRAW
+              TIME
             </button>
             <button
               onClick={() => setSortMode('suit')}
