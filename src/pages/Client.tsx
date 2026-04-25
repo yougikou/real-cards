@@ -397,6 +397,7 @@ export default function Client() {
                     }
                     return { ...prev, players: newPlayers };
                   });
+                  window.alert("Mock: 1 card stolen from opponent's hand.");
                 } else {
                   // In a real app we'd need to know the hidden card ID,
                   // but since we only have count on client, we need a way for host to pick random.
@@ -428,6 +429,21 @@ export default function Client() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
+      {isPreview && (
+        <div className="bg-purple-900/40 border-2 border-purple-500 border-dashed rounded-lg p-3 mb-4 flex justify-between items-center shadow-lg">
+          <div className="flex flex-col">
+            <span className="text-purple-300 font-bold text-sm">Preview Harness</span>
+            <span className="text-purple-400/80 text-xs">Test dark-card interactions</span>
+          </div>
+          <button
+            onClick={() => setViewOther('mock-peer-1')}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 px-4 rounded shadow transition-colors active:scale-95 text-sm"
+          >
+            Inspect Alice
+          </button>
+        </div>
+      )}
+
       {/* Read-Only Table Info Banner */}
       {activeGameState && (
         <div className="flex justify-between items-center bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
