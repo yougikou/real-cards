@@ -170,16 +170,16 @@ export default function Host() {
               {gameState.playStack.length > 0 ? (
                 <button
                   onClick={() => window.dispatchEvent(new Event('host-clear-table'))}
-                  className="pointer-events-auto bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-1.5 rounded-full border border-gray-600 text-xs uppercase tracking-wider font-bold transition-colors shadow-lg active:scale-95"
+                  className="pointer-events-auto bg-amber-500 hover:bg-amber-400 text-black px-6 py-2 rounded-full border-2 border-amber-300 text-sm uppercase tracking-wider font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.5)] active:scale-95"
                 >
-                  Clear to Discard ↓
+                  Clear Area to Discard ↓
                 </button>
               ) : (
                 <button
                   disabled
                   className="pointer-events-auto bg-gray-800/50 text-gray-500 px-4 py-1.5 rounded-full border border-gray-600/50 text-xs uppercase tracking-wider font-bold cursor-not-allowed shadow-none"
                 >
-                  Play Area Empty
+                  Clear to Discard (Area Empty)
                 </button>
               )}
             </div>
