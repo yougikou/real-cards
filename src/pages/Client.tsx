@@ -283,6 +283,23 @@ export default function Client() {
     }
   };
 
+  const handleDrawAction = (e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (isPreview) {
+      if (localGameState.deckCount > 0) {
+        const newCard: Card = { id: `mock-drawn-${Date.now()}`, suit: 'spades', rank: '7' };
+        setLocalHand(prev => [...prev, newCard]);
+        setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount - 1 }));
+      } else {
+        window.alert("Mock: Deck is empty.");
+      }
+    } else {
+      drawCard(1);
+    }
+  };
+
   const handleSwipeDownDrawReturn = (e: React.TouchEvent, toTop: boolean = false) => {
     const touchEndY = e.changedTouches[0].clientY;
     const dragY = touchEndY - touchStartY;
@@ -292,12 +309,7 @@ export default function Client() {
       if (selectedCards.length > 0) {
         handleReturnSelected(toTop);
       } else {
-        if (isPreview) {
-          const newCard: Card = { id: `mock-drawn-${Date.now()}`, suit: 'spades', rank: '7' };
-          setLocalHand(prev => [...prev, newCard]);
-        } else {
-          drawCard(1);
-        }
+        handleDrawAction();
       }
     }
   };
@@ -569,10 +581,14 @@ export default function Client() {
           onTouchStart={handleTouchStart}
           onTouchEnd={(e) => handleSwipeDownDrawReturn(e)}
         >
-          <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none">
-            ↓ Swipe down to
-            <br />
-            DRAW (1)
+          <button
+            onClick={handleDrawAction}
+            className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 shadow-lg mb-1 pointer-events-auto"
+          >
+            DRAW 1
+          </button>
+          <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
+            ↓ (OR SWIPE DOWN)
           </span>
         </div>
       ) : (
