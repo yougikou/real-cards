@@ -223,16 +223,35 @@ class TableScene extends Phaser.Scene {
     for (let i = 0; i < this.playerZones.length; i++) {
       const zone = this.playerZones[i];
       const player = this.connectedPlayers[i];
+
+      let isHovered = false;
+      if (this.dragCard && Phaser.Geom.Rectangle.Contains(zone.rect.getBounds(), this.dragCard.x, this.dragCard.y)) {
+        isHovered = true;
+      }
+
       if (player) {
         zone.mappedPlayerId = player.id;
         if (zone.text) {
-          zone.text.setText(`📥 DROP TO DEAL:\n${player.name}\nCards: ${player.handCount}`);
-          zone.text.setColor('#fbbf24'); // yellow-400
-          zone.text.setFontStyle('bold');
+          if (this.dragCard) {
+            zone.text.setText(isHovered ? `📥 DEAL TO:\n${player.name}` : `\n${player.name}\nCards: ${player.handCount}`);
+            zone.text.setColor(isHovered ? '#fbbf24' : '#ffffff'); // yellow-400 or white
+            zone.text.setFontStyle(isHovered ? 'bold' : 'normal');
+            zone.text.setAlpha(1);
+          } else {
+            zone.text.setText(`\n${player.name}\nCards: ${player.handCount}`);
+            zone.text.setColor('#ffffff');
+            zone.text.setFontStyle('normal');
+            zone.text.setAlpha(0.3);
+          }
         }
         if (zone.rect) {
-          zone.rect.setFillStyle(0x10b981, 0.2); // emerald-500
-          zone.rect.setStrokeStyle(4, 0xfbbf24, 1); // yellow-400
+          if (this.dragCard) {
+            zone.rect.setFillStyle(isHovered ? 0x10b981 : 0x000000, isHovered ? 0.4 : 0.2); // emerald-500
+            zone.rect.setStrokeStyle(isHovered ? 4 : 2, isHovered ? 0xfbbf24 : 0xffffff, isHovered ? 1 : 0.5); // yellow-400 or white
+          } else {
+            zone.rect.setFillStyle(0x000000, 0.1);
+            zone.rect.setStrokeStyle(2, 0xffffff, 0.2);
+          }
         }
       } else {
         zone.mappedPlayerId = undefined;
@@ -240,10 +259,11 @@ class TableScene extends Phaser.Scene {
           zone.text.setText(`[ ${zone.defaultText} ]\nWaiting for player...`);
           zone.text.setColor('#888888');
           zone.text.setFontStyle('normal');
+          zone.text.setAlpha(this.dragCard ? 0.1 : 0.3);
         }
         if (zone.rect) {
           zone.rect.setFillStyle(0x000000, 0.1);
-          zone.rect.setStrokeStyle(2, 0xffffff, 0.3);
+          zone.rect.setStrokeStyle(2, 0xffffff, this.dragCard ? 0.1 : 0.3);
         }
       }
     }
@@ -313,12 +333,15 @@ class TableScene extends Phaser.Scene {
             }
         );
     }
+
+    this.updateZoneLabels();
   }
 
   private setupInteractions() {
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
         if (this.dragCard && this.pointerBody && this.dragConstraint && this.matter) {
              this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
+             this.updateZoneLabels();
         } else if (pointer.isDown) {
              this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
              this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
@@ -334,6 +357,7 @@ class TableScene extends Phaser.Scene {
                  this.matter.world.removeConstraint(this.dragConstraint);
                  this.dragConstraint = null;
              }
+             this.updateZoneLabels();
          }
     });
 
