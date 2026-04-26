@@ -222,7 +222,7 @@ export default function Host() {
           >
             <div className="text-white/80 font-bold mb-2">Deck</div>
             <div className="text-3xl font-black">{gameState.deckCount}</div>
-            {gameState.deckCount > 0 && <div className="text-white/60 text-xs mt-2">Tap to draw</div>}
+            {gameState.deckCount > 0 && <div className="text-white/60 text-xs mt-2 text-center">Tap to draw<br/>to table</div>}
           </div>
 
           {/* Reset & Shuffle (Discard) */}
@@ -240,7 +240,8 @@ export default function Host() {
 
         {/* Navigation Affordance / Controls */}
         <div className="absolute bottom-4 left-4 bg-black/60 border border-white/20 p-3 rounded-lg text-white/90 text-sm flex gap-4 pointer-events-auto backdrop-blur-sm shadow-lg">
-          <span className="flex items-center gap-2 text-yellow-300 font-bold border border-yellow-500/50 bg-yellow-900/30 px-2 py-0.5 rounded">🃏 Drag cards to seats to deal</span>
+          <span className="flex items-center gap-2 text-yellow-300 font-bold border border-yellow-500/50 bg-yellow-900/30 px-2 py-0.5 rounded">🃏 Drag center cards to deal</span>
+          <span className="flex items-center gap-2 text-blue-300 font-bold border border-blue-500/50 bg-blue-900/30 px-2 py-0.5 rounded">👆 Tap top-right deck to draw</span>
           <span className="flex items-center gap-2">🖐️ Drag to pan</span>
           <span className="flex items-center gap-2">🔍 Scroll to zoom</span>
           <button

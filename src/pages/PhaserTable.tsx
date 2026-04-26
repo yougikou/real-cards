@@ -19,6 +19,7 @@ class TableScene extends Phaser.Scene {
   private dragConstraint: MatterJS.ConstraintType | null = null;
   private dragCard: Phaser.Physics.Matter.Image | null = null;
   private pointerBody: MatterJS.BodyType | null = null;
+  private deckText: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super('TableScene');
@@ -138,6 +139,10 @@ class TableScene extends Phaser.Scene {
             card.setPosition(deckX + i * 2, deckY - i * 2);
         }
     }
+
+    if (this.deckText) {
+        this.deckText.setPosition(deckX, deckY + 60);
+    }
   }
 
   private createPlayerZones() {
@@ -221,7 +226,7 @@ class TableScene extends Phaser.Scene {
       if (player) {
         zone.mappedPlayerId = player.id;
         if (zone.text) {
-          zone.text.setText(`📥 DEAL TO:\n${player.name}\nCards: ${player.handCount}`);
+          zone.text.setText(`📥 DROP TO DEAL:\n${player.name}\nCards: ${player.handCount}`);
           zone.text.setColor('#fbbf24'); // yellow-400
           zone.text.setFontStyle('bold');
         }
@@ -232,13 +237,13 @@ class TableScene extends Phaser.Scene {
       } else {
         zone.mappedPlayerId = undefined;
         if (zone.text) {
-          zone.text.setText(`Empty\n(${zone.defaultText})`);
+          zone.text.setText(`[ ${zone.defaultText} ]\nWaiting for player...`);
           zone.text.setColor('#888888');
           zone.text.setFontStyle('normal');
         }
         if (zone.rect) {
           zone.rect.setFillStyle(0x000000, 0.1);
-          zone.rect.setStrokeStyle(2, 0xffffff, 0.1);
+          zone.rect.setStrokeStyle(2, 0xffffff, 0.3);
         }
       }
     }
@@ -262,6 +267,8 @@ class TableScene extends Phaser.Scene {
       }
       this.deckSprites.push(card);
     }
+
+    this.deckText = this.add.text(deckX, deckY + 60, 'DRAG TO DEAL\nTO SEATS', { color: '#ffffff', fontSize: '14px', align: 'center' }).setOrigin(0.5).setAlpha(0.5);
   }
 
   private spawnAndDragCard(pointer: Phaser.Input.Pointer, startX: number, startY: number) {
