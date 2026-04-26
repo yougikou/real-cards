@@ -266,12 +266,26 @@ class TableScene extends Phaser.Scene {
 
   private spawnAndDragCard(pointer: Phaser.Input.Pointer, startX: number, startY: number) {
     if (!this.matter) return;
+
+    let poppedCard: unknown = null;
+    window.dispatchEvent(new CustomEvent('host-pop-card', {
+      detail: {
+        callback: (card: unknown) => {
+          poppedCard = card;
+        }
+      }
+    }));
+
+    if (!poppedCard) return;
+
     const newCard = this.matter.add.image(startX, startY, 'cardFront', undefined, {
         mass: 0.1,
         friction: 0.1,
         frictionAir: 0.05,
         restitution: 0.2
     });
+
+    Object.assign(newCard, { cardData: poppedCard });
 
     newCard.setAngle(Phaser.Math.Between(-5, 5));
     this.dragCard = newCard;
@@ -332,7 +346,7 @@ class TableScene extends Phaser.Scene {
          }
     }
 
-    if (targetZone) {
+    if (targetZone && targetZone.mappedPlayerId) {
         card.setStatic(true);
 
         this.tweens.add({
@@ -345,17 +359,40 @@ class TableScene extends Phaser.Scene {
             duration: 400,
             ease: 'Power2',
             onComplete: () => {
+                const cardData = (card as Phaser.Physics.Matter.Image & { cardData?: unknown }).cardData;
                 card.destroy();
                 if (targetZone?.mappedPlayerId) {
-                  this.onCardDealt(targetZone.mappedPlayerId);
+                  window.dispatchEvent(new CustomEvent('host-deal-card', {
+                    detail: { playerId: targetZone.mappedPlayerId, cardData }
+                  }));
+                }
+            }
+        });
+    } else {
+        // Return to deck if dropped on invalid area
+        card.setStatic(true);
+        const { width, height } = this.scale;
+
+        this.tweens.add({
+            targets: card,
+            x: width / 2,
+            y: height / 2,
+            scaleX: 0.5,
+            scaleY: 0.5,
+            alpha: 0,
+            duration: 400,
+            ease: 'Power2',
+            onComplete: () => {
+                const cardData = (card as Phaser.Physics.Matter.Image & { cardData?: unknown }).cardData;
+                card.destroy();
+                if (cardData) {
+                    window.dispatchEvent(new CustomEvent('host-return-popped-card', {
+                        detail: { cardData }
+                    }));
                 }
             }
         });
     }
-  }
-
-  private onCardDealt(playerId: string) {
-      window.dispatchEvent(new CustomEvent('host-deal-card', { detail: { playerId } }));
   }
 }
 

@@ -245,13 +245,20 @@ export function useHost() {
 
   useEffect(() => {
     const handleHostDeal = (e: Event) => {
-      const customEvent = e as CustomEvent<{ playerId: string }>;
-      const { playerId } = customEvent.detail;
+      const customEvent = e as CustomEvent<{ playerId: string, cardData?: Card }>;
+      const { playerId, cardData } = customEvent.detail;
 
       if (!serverStateRef.current.playerHands[playerId]) return;
-      if (serverStateRef.current.deck.length === 0) return;
 
-      const [dealtCard] = serverStateRef.current.deck.splice(0, 1);
+      let dealtCard: Card;
+      if (cardData) {
+        dealtCard = cardData;
+      } else {
+        if (serverStateRef.current.deck.length === 0) return;
+        const [popped] = serverStateRef.current.deck.splice(0, 1);
+        dealtCard = popped;
+      }
+
       serverStateRef.current.playerHands[playerId].push(dealtCard);
 
       const msg: HostMessage = { type: 'RECEIVE_CARDS', payload: [dealtCard] };
@@ -267,6 +274,36 @@ export function useHost() {
             handCount: serverStateRef.current.playerHands[playerId].length
           }
         }
+      }));
+    };
+
+    const handleHostPopCard = (e: Event) => {
+      const customEvent = e as CustomEvent<{ callback: (card: Card | null) => void }>;
+      const { callback } = customEvent.detail;
+
+      if (serverStateRef.current.deck.length === 0) {
+        callback(null);
+        return;
+      }
+
+      const [popped] = serverStateRef.current.deck.splice(0, 1);
+
+      updateStateAndBroadcast(prev => ({
+        ...prev,
+        deckCount: serverStateRef.current.deck.length
+      }));
+      callback(popped);
+    };
+
+    const handleHostReturnPoppedCard = (e: Event) => {
+      const customEvent = e as CustomEvent<{ cardData: Card }>;
+      const { cardData } = customEvent.detail;
+
+      serverStateRef.current.deck.unshift(cardData);
+
+      updateStateAndBroadcast(prev => ({
+        ...prev,
+        deckCount: serverStateRef.current.deck.length
       }));
     };
 
@@ -320,11 +357,15 @@ export function useHost() {
     };
 
     window.addEventListener('host-deal-card', handleHostDeal);
+    window.addEventListener('host-pop-card', handleHostPopCard);
+    window.addEventListener('host-return-popped-card', handleHostReturnPoppedCard);
     window.addEventListener('host-draw-to-table', handleHostDrawToTable);
     window.addEventListener('host-return-batch', handleHostReturnBatch);
     window.addEventListener('host-clear-table', handleHostClearTable);
     return () => {
       window.removeEventListener('host-deal-card', handleHostDeal);
+      window.removeEventListener('host-pop-card', handleHostPopCard);
+      window.removeEventListener('host-return-popped-card', handleHostReturnPoppedCard);
       window.removeEventListener('host-draw-to-table', handleHostDrawToTable);
       window.removeEventListener('host-return-batch', handleHostReturnBatch);
       window.removeEventListener('host-clear-table', handleHostClearTable);
