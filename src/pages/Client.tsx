@@ -672,10 +672,11 @@ export default function Client() {
               if (p.id === peerId) return null;
 
               return (
-                <div
+                <button
                   key={p.id}
+                  type="button"
                   onClick={() => setViewOther(p.id)}
-                  className="flex-shrink-0 bg-gray-800 border border-gray-700 rounded-lg p-3 w-32 cursor-pointer hover:bg-gray-700 hover:border-blue-500 active:scale-95 transition-all flex flex-col justify-between group"
+                  className="flex-shrink-0 text-left bg-gray-800 border border-gray-700 rounded-lg p-3 w-32 cursor-pointer hover:bg-gray-700 hover:border-blue-500 active:scale-95 transition-all flex flex-col justify-between group"
                 >
                   <div>
                     <div className="font-bold truncate text-sm text-white group-hover:text-blue-400 transition-colors">{p.name}</div>
@@ -684,7 +685,7 @@ export default function Client() {
                   <div className="text-xs text-blue-500 mt-2 font-semibold uppercase tracking-widest opacity-80 group-hover:opacity-100 flex items-center gap-1">
                     <span>👁 Inspect</span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
