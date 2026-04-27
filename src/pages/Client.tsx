@@ -223,12 +223,12 @@ export default function Client() {
         key={card.id}
         onClick={() => toggleSelect(card.id)}
         className={`
-          relative aspect-[2/3] bg-white rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200
-          ${isSelected ? 'ring-4 ring-blue-500 -translate-y-2' : 'hover:-translate-y-1'}
+          relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200
+          ${isSelected ? 'bg-blue-50 ring-4 ring-blue-500 -translate-y-4 scale-105 shadow-xl z-10' : 'bg-white hover:-translate-y-1'}
         `}
       >
         {isSelected && (
-          <div className="absolute top-1 right-1 bg-blue-500 rounded-full w-5 h-5 flex items-center justify-center text-xs text-white z-10">
+          <div className="absolute -top-2 -right-2 bg-blue-500 border-2 border-white rounded-full w-8 h-8 flex items-center justify-center text-base font-bold text-white z-20 shadow">
             ✓
           </div>
         )}
@@ -480,18 +480,20 @@ export default function Client() {
         </div>
       ) : (
         <div
-          className="min-h-20 border-2 border-dashed border-green-600 rounded-xl flex flex-col items-center justify-center mb-4 bg-green-900/30 cursor-pointer px-3 py-3"
+          className="min-h-20 border-2 border-green-500 rounded-xl flex flex-col items-center justify-center mb-4 bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-4 transition-all duration-300"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleSwipeUpPlay}
         >
           <button
             onClick={handlePlaySelected}
-            className="rounded-lg bg-green-600 px-6 py-3 text-lg font-bold text-white transition-colors hover:bg-green-700 active:scale-95 shadow-lg mb-1 pointer-events-auto"
+            className="w-full rounded-xl bg-green-600 px-6 py-4 text-2xl font-black text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg mb-2 pointer-events-auto flex items-center justify-center gap-2"
           >
-            PLAY {selectedCards.length} CARD{selectedCards.length > 1 ? 'S' : ''}
+            <span>⬆️</span>
+            <span>PLAY {selectedCards.length} CARD{selectedCards.length > 1 ? 'S' : ''}</span>
+            <span>⬆️</span>
           </button>
-          <span className="text-green-400 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
-            ↑ (OR SWIPE UP)
+          <span className="text-green-400 font-bold uppercase tracking-widest text-center text-[11px] pointer-events-none opacity-80">
+            TAP ABOVE OR SWIPE UP TO PLAY
           </span>
         </div>
       )}
