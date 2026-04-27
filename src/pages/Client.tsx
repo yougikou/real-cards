@@ -465,38 +465,18 @@ export default function Client() {
       )}
 
       {/* Top Play Zone Indicator */}
-      {selectedCards.length === 0 ? (
-        <div
-          className="min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center mb-4 bg-gray-800/50 cursor-pointer px-3 py-3"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleSwipeUpPlay}
-        >
-          <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none mb-1">
-            Play Zone
-          </span>
-          <span className="text-gray-600 text-xs text-center pointer-events-none">
-            Select cards from your hand to play
-          </span>
-        </div>
-      ) : (
-        <div
-          className="min-h-20 border-2 border-green-500 rounded-xl flex flex-col items-center justify-center mb-4 bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-4 transition-all duration-300"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleSwipeUpPlay}
-        >
-          <button
-            onClick={handlePlaySelected}
-            className="w-full rounded-xl bg-green-600 px-6 py-4 text-2xl font-black text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg mb-2 pointer-events-auto flex items-center justify-center gap-2"
-          >
-            <span>⬆️</span>
-            <span>PLAY {selectedCards.length} CARD{selectedCards.length > 1 ? 'S' : ''}</span>
-            <span>⬆️</span>
-          </button>
-          <span className="text-green-400 font-bold uppercase tracking-widest text-center text-[11px] pointer-events-none opacity-80">
-            TAP ABOVE OR SWIPE UP TO PLAY
-          </span>
-        </div>
-      )}
+      <div
+        className="min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center mb-4 bg-gray-800/50 cursor-pointer px-3 py-3"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleSwipeUpPlay}
+      >
+        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none mb-1">
+          Play Zone
+        </span>
+        <span className="text-gray-600 text-xs text-center pointer-events-none">
+          Select cards to Play (or play to discard)
+        </span>
+      </div>
 
       {activeGameState && activeGameState.playStack.length > 0 && (
         <div className="mb-4 flex flex-col gap-2">
@@ -614,56 +594,79 @@ export default function Client() {
       </div>
 
       {/* Bottom Draw/Return Zone Indicator */}
-      {selectedCards.length === 0 ? (
-        <div
-          className="mt-4 min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-3 py-3"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={(e) => handleSwipeDownDrawReturn(e)}
+      <div
+        className="mt-4 min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-3 py-3"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={(e) => handleSwipeDownDrawReturn(e)}
+      >
+        <button
+          onClick={handleDrawAction}
+          className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 shadow-lg mb-1 pointer-events-auto"
         >
-          <button
-            onClick={handleDrawAction}
-            className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 shadow-lg mb-1 pointer-events-auto"
-          >
-            DRAW 1
-          </button>
-          <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
-            ↓ (OR SWIPE DOWN)
-          </span>
-        </div>
-      ) : (
-        <div className="mt-4 flex gap-2 w-full">
+          DRAW 1
+        </button>
+        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
+          ↓ (OR SWIPE DOWN)
+        </span>
+      </div>
+
+      {selectedCards.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 border-t-2 border-gray-700 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 flex flex-col gap-3 pb-safe">
           <div
-            className="flex-1 min-h-20 border-2 border-dashed border-blue-600 rounded-xl flex flex-col items-center justify-center bg-blue-900/30 cursor-pointer px-2 py-3"
+            className="w-full border-2 border-green-500 rounded-xl flex flex-col items-center justify-center bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-3"
             onTouchStart={handleTouchStart}
-            onTouchEnd={(e) => handleSwipeDownDrawReturn(e, true)}
+            onTouchEnd={handleSwipeUpPlay}
           >
-            <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-xs pointer-events-none mb-2">
-              ↓ Swipe down
-            </span>
             <button
-              onClick={() => handleReturnSelected(true)}
-              className="w-full max-w-[150px] rounded-lg bg-blue-600 px-2 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto"
+              onClick={handlePlaySelected}
+              className="w-full rounded-xl bg-green-600 px-6 py-3 text-xl font-black text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg mb-1 pointer-events-auto flex items-center justify-center gap-2"
             >
-              Return Top
+              <span>⬆️</span>
+              <span>PLAY {selectedCards.length} CARD{selectedCards.length > 1 ? 'S' : ''}</span>
+              <span>⬆️</span>
             </button>
+            <span className="text-green-400 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none opacity-80">
+              TAP ABOVE OR SWIPE UP TO PLAY (OR DISCARD)
+            </span>
           </div>
-          <div
-            className="flex-1 min-h-20 border-2 border-dashed border-gray-500 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-2 py-3"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={(e) => handleSwipeDownDrawReturn(e, false)}
-          >
-            <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-xs pointer-events-none mb-2">
-              ↓ Swipe down
-            </span>
-            <button
-              onClick={() => handleReturnSelected(false)}
-              className="w-full max-w-[150px] rounded-lg bg-gray-700 px-2 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto"
+
+          <div className="flex gap-2 w-full">
+            <div
+              className="flex-1 border border-blue-600 rounded-xl flex flex-col items-center justify-center bg-blue-900/30 cursor-pointer px-2 py-2"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={(e) => handleSwipeDownDrawReturn(e, true)}
             >
-              Return Bottom
-            </button>
+              <button
+                onClick={() => handleReturnSelected(true)}
+                className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1"
+              >
+                Return Top
+              </button>
+              <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
+                ↓ SWIPE DOWN
+              </span>
+            </div>
+            <div
+              className="flex-1 border border-gray-500 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-2 py-2"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={(e) => handleSwipeDownDrawReturn(e, false)}
+            >
+               <button
+                onClick={() => handleReturnSelected(false)}
+                className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1"
+              >
+                Return Bottom
+              </button>
+              <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
+                ↓ SWIPE DOWN
+              </span>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Padding to allow scrolling past fixed menu when cards are selected */}
+      {selectedCards.length > 0 && <div className="h-48 flex-shrink-0" />}
 
       {/* Other Players Area */}
       {activeGameState && Object.keys(activeGameState.players).length > 1 && (
