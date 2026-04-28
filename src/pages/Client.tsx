@@ -225,11 +225,11 @@ export default function Client() {
         onClick={() => toggleSelect(card.id)}
         className={`
           relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200
-          ${isSelected ? 'bg-blue-100 ring-4 ring-blue-500 -translate-y-6 scale-105 shadow-2xl z-20' : `bg-white hover:-translate-y-1 ${hasSelection ? 'opacity-50 saturate-50' : ''}`}
+          ${isSelected ? 'bg-yellow-100 ring-4 ring-yellow-400 -translate-y-6 scale-105 shadow-[0_0_25px_rgba(250,204,21,0.6)] z-20' : `bg-white hover:-translate-y-1 ${hasSelection ? 'opacity-30 saturate-50 scale-95' : ''}`}
         `}
       >
         {isSelected && (
-          <div className="absolute -top-2 -right-2 bg-blue-500 border-2 border-white rounded-full w-8 h-8 flex items-center justify-center text-base font-bold text-white z-20 shadow">
+          <div className="absolute -top-2 -right-2 bg-yellow-500 border-2 border-yellow-300 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold text-gray-900 z-20 shadow">
             ✓
           </div>
         )}
@@ -612,7 +612,10 @@ export default function Client() {
       </div>
 
       {selectedCards.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 border-t-2 border-gray-700 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 flex flex-col gap-3 pb-safe">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 border-t-2 border-yellow-400 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 flex flex-col gap-3 pb-safe">
+          <div className="text-yellow-400 text-xs font-bold uppercase tracking-wider text-center -mb-1">
+            Actions for {selectedCards.length} selected card{selectedCards.length > 1 ? 's' : ''}
+          </div>
           <div
             className="w-full border-2 border-green-500 rounded-xl flex flex-col items-center justify-center bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-3"
             onTouchStart={handleTouchStart}
@@ -641,7 +644,7 @@ export default function Client() {
                 onClick={() => handleReturnSelected(true)}
                 className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1"
               >
-                Return to Deck (Top)
+                <span>Return to Deck (Top)</span>
               </button>
               <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
                 ↓ SWIPE DOWN
@@ -656,7 +659,7 @@ export default function Client() {
                 onClick={() => handleReturnSelected(false)}
                 className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1"
               >
-                Return to Deck (Bottom)
+                <span>Return to Deck (Bottom)</span>
               </button>
               <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
                 ↓ SWIPE DOWN
