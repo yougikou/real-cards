@@ -216,6 +216,7 @@ export default function Client() {
 
   const renderCard = (card: Card, index: number = -1) => {
     const isSelected = selectedCards.includes(card.id);
+    const hasSelection = selectedCards.length > 0;
     const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
 
     return (
@@ -224,7 +225,7 @@ export default function Client() {
         onClick={() => toggleSelect(card.id)}
         className={`
           relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200
-          ${isSelected ? 'bg-blue-50 ring-4 ring-blue-500 -translate-y-4 scale-105 shadow-xl z-10' : 'bg-white hover:-translate-y-1'}
+          ${isSelected ? 'bg-blue-100 ring-4 ring-blue-500 -translate-y-6 scale-105 shadow-2xl z-20' : `bg-white hover:-translate-y-1 ${hasSelection ? 'opacity-50 saturate-50' : ''}`}
         `}
       >
         {isSelected && (
@@ -640,7 +641,7 @@ export default function Client() {
                 onClick={() => handleReturnSelected(true)}
                 className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1"
               >
-                Return Top
+                Return to Deck (Top)
               </button>
               <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
                 ↓ SWIPE DOWN
@@ -655,7 +656,7 @@ export default function Client() {
                 onClick={() => handleReturnSelected(false)}
                 className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1"
               >
-                Return Bottom
+                Return to Deck (Bottom)
               </button>
               <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
                 ↓ SWIPE DOWN
