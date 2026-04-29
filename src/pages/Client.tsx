@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useClient } from '../hooks/useClient';
 import type { Card, Suit, Rank } from '../types';
+import { playDrawSound } from '../utils/audio/draw';
 
 const SUIT_ORDER: Record<Suit, number> = {
   hearts: 1,
@@ -90,11 +91,36 @@ export default function Client() {
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [viewOther, setViewOther] = useState<string | null>(null);
 
+  // Draw feedback state
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [recentlyDrawnCardIds, setRecentlyDrawnCardIds] = useState<string[]>([]);
+
   // Gesture state
   const [touchStartY, setTouchStartY] = useState(0);
 
   const [sortMode, setSortMode] = useState<SortMode>('draw');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
+
+  // Track newly drawn cards to apply visual highlights
+  const previousHandRef = React.useRef<Card[]>(hand);
+  React.useEffect(() => {
+    const previousHand = previousHandRef.current;
+
+    // Find newly added cards (cards in current hand that were not in previous hand)
+    const newCards = hand.filter(card => !previousHand.some(prev => prev.id === card.id));
+
+    if (newCards.length > 0) {
+      const newCardIds = newCards.map(c => c.id);
+      setRecentlyDrawnCardIds(prev => [...prev, ...newCardIds]);
+
+      // Clear highlight after 800ms
+      setTimeout(() => {
+        setRecentlyDrawnCardIds(prev => prev.filter(id => !newCardIds.includes(id)));
+      }, 800);
+    }
+
+    previousHandRef.current = hand;
+  }, [hand]);
 
   // Update custom order when hand changes but do not cause cascading renders
   React.useEffect(() => {
@@ -217,16 +243,23 @@ export default function Client() {
   const renderCard = (card: Card, index: number = -1) => {
     const isSelected = selectedCards.includes(card.id);
     const hasSelection = selectedCards.length > 0;
+    const isRecentlyDrawn = recentlyDrawnCardIds.includes(card.id);
     const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
+
+    let cardClasses = 'bg-white hover:-translate-y-1';
+    if (isSelected) {
+      cardClasses = 'bg-blue-100 ring-8 ring-blue-500 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(59,130,246,0.6)] z-30';
+    } else if (hasSelection) {
+      cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
+    } else if (isRecentlyDrawn) {
+      cardClasses = 'bg-green-50 ring-4 ring-green-400 scale-105 shadow-[0_0_20px_rgba(74,222,128,0.5)] z-20 -translate-y-2';
+    }
 
     return (
       <div
         key={card.id}
         onClick={() => toggleSelect(card.id)}
-        className={`
-          relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200
-          ${isSelected ? 'bg-blue-100 ring-8 ring-blue-500 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(59,130,246,0.6)] z-30' : `bg-white hover:-translate-y-1 ${hasSelection ? 'opacity-40 saturate-50 scale-95' : ''}`}
-        `}
+        className={`relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200 ${cardClasses}`}
       >
         {isSelected && (
           <div className="absolute -top-3 -right-3 bg-blue-600 border-4 border-white rounded-full w-10 h-10 flex items-center justify-center text-xl font-black text-white z-30 shadow-xl">
@@ -288,6 +321,18 @@ export default function Client() {
     if (e) {
       e.stopPropagation();
     }
+
+    if (isDrawing) return;
+
+    setIsDrawing(true);
+    setTimeout(() => setIsDrawing(false), 300);
+
+    // Haptic and audio feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(15);
+    }
+    playDrawSound();
+
     if (isPreview) {
       if (localGameState.deckCount > 0) {
         const newCard: Card = { id: `mock-drawn-${Date.now()}`, suit: 'spades', rank: '7' };
@@ -602,9 +647,12 @@ export default function Client() {
       >
         <button
           onClick={handleDrawAction}
-          className="rounded-lg bg-blue-600 px-6 py-3 text-lg font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 shadow-lg mb-1 pointer-events-auto"
+          disabled={isDrawing}
+          className={`rounded-lg px-6 py-3 text-lg font-bold text-white transition-all shadow-lg mb-1 pointer-events-auto flex items-center justify-center gap-2 ${
+            isDrawing ? 'bg-blue-800 scale-95 opacity-80 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
+          }`}
         >
-          DRAW 1
+          {isDrawing ? <span>DRAWING...</span> : <span>DRAW 1</span>}
         </button>
         <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
           ↓ (OR SWIPE DOWN)
