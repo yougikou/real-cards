@@ -64,7 +64,7 @@ export default function Client() {
   const { hostId } = useParams<{ hostId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const playerName = searchParams.get('name') || 'Player';
-  const isPreview = searchParams.get('preview') === 'true';
+  const isPreview = searchParams.get('preview') === 'true' || window.location.href.includes('preview=true');
 
   const {
     status: realStatus,
@@ -225,11 +225,11 @@ export default function Client() {
         onClick={() => toggleSelect(card.id)}
         className={`
           relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200
-          ${isSelected ? 'bg-yellow-100 ring-4 ring-yellow-400 -translate-y-6 scale-105 shadow-[0_0_25px_rgba(250,204,21,0.6)] z-20' : `bg-white hover:-translate-y-1 ${hasSelection ? 'opacity-30 saturate-50 scale-95' : ''}`}
+          ${isSelected ? 'bg-blue-100 ring-8 ring-blue-500 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(59,130,246,0.6)] z-30' : `bg-white hover:-translate-y-1 ${hasSelection ? 'opacity-40 saturate-50 scale-95' : ''}`}
         `}
       >
         {isSelected && (
-          <div className="absolute -top-2 -right-2 bg-yellow-500 border-2 border-yellow-300 rounded-full w-8 h-8 flex items-center justify-center text-base font-bold text-gray-900 z-20 shadow">
+          <div className="absolute -top-3 -right-3 bg-blue-600 border-4 border-white rounded-full w-10 h-10 flex items-center justify-center text-xl font-black text-white z-30 shadow-xl">
             ✓
           </div>
         )}
@@ -644,7 +644,7 @@ export default function Client() {
                 onClick={() => handleReturnSelected(true)}
                 className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1"
               >
-                <span>Return to Deck (Top)</span>
+                <span>RETURN {selectedCards.length} TO TOP</span>
               </button>
               <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
                 ↓ SWIPE DOWN
@@ -659,7 +659,7 @@ export default function Client() {
                 onClick={() => handleReturnSelected(false)}
                 className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1"
               >
-                <span>Return to Deck (Bottom)</span>
+                <span>RETURN {selectedCards.length} TO BOTTOM</span>
               </button>
               <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
                 ↓ SWIPE DOWN
