@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -25,10 +25,6 @@ export default function Home() {
     if (roomId && playerName) {
       navigate(`/client/${roomId}?name=${encodeURIComponent(playerName)}`);
     }
-  };
-
-  const handlePreviewMode = () => {
-    navigate('/client/preview_room?name=Previewer&preview=true');
   };
 
   return (
@@ -100,12 +96,12 @@ export default function Home() {
 
         <div className="mt-8 pt-6 border-t border-gray-200">
           <h2 className="text-xl font-semibold mb-4 text-center text-gray-700">Explore UI</h2>
-          <button
-            onClick={handlePreviewMode}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition-colors shadow-sm"
+          <Link
+            to="/client/preview_room?name=Previewer&preview=true"
+            className="block text-center w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition-colors shadow-sm"
           >
             Try Client Preview Mode
-          </button>
+          </Link>
           <p className="text-xs text-gray-500 text-center mt-2">
             Test the hand UI locally without needing a Host connection.
           </p>
