@@ -688,9 +688,10 @@ export default function Client() {
             >
               <button
                 onClick={() => handleReturnSelected(true)}
-                className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1"
+                className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1 flex flex-col items-center"
               >
-                <span>RETURN {selectedCards.length} TO TOP</span>
+                <span>⏫ RETURN {selectedCards.length} TO TOP</span>
+                <span className="text-[9px] opacity-80 font-normal mt-0.5">(Next to be drawn)</span>
               </button>
               <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
                 ↓ SWIPE DOWN
@@ -703,9 +704,10 @@ export default function Client() {
             >
                <button
                 onClick={() => handleReturnSelected(false)}
-                className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1"
+                className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1 flex flex-col items-center"
               >
-                <span>RETURN {selectedCards.length} TO BOTTOM</span>
+                <span>⏬ RETURN {selectedCards.length} TO BOTTOM</span>
+                <span className="text-[9px] opacity-80 font-normal mt-0.5">(Bury under deck)</span>
               </button>
               <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
                 ↓ SWIPE DOWN
