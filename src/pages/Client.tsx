@@ -455,11 +455,9 @@ export default function Client() {
               }}
               className="group relative aspect-[2/3] bg-blue-800 rounded-lg border-2 border-white/20 flex items-center justify-center cursor-pointer hover:bg-blue-600 hover:border-yellow-400 hover:-translate-y-1 transition-all shadow-md overflow-hidden"
             >
-              <div className="text-white/30 font-black text-3xl group-hover:opacity-0 transition-opacity">?</div>
-              <div className="absolute inset-0 bg-yellow-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <span className="bg-yellow-500 text-gray-900 font-bold text-xs uppercase px-2 py-1 rounded shadow-lg transform -rotate-12">
-                  Steal
-                </span>
+              <div className="flex flex-col items-center justify-center pointer-events-none">
+                <div className="text-white/30 font-black text-3xl mb-1">?</div>
+                <div className="text-yellow-400 font-bold text-[10px] uppercase tracking-wider bg-black/40 px-2 py-0.5 rounded">Tap to Draw</div>
               </div>
             </div>
           ))}
@@ -723,7 +721,7 @@ export default function Client() {
       {/* Other Players Area */}
       {activeGameState && Object.keys(activeGameState.players).length > 1 && (
         <div className="mt-4 pt-4 border-t border-gray-800">
-          <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players (Tap to Inspect)</h2>
+          <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players (Peek & Draw)</h2>
           <div className="flex overflow-x-auto gap-3 pb-2">
             {Object.values(activeGameState.players).map(p => {
               if (p.id === peerId) return null;
@@ -740,7 +738,7 @@ export default function Client() {
                     <div className="text-xs text-gray-400 mt-1">{p.handCount} cards</div>
                   </div>
                   <div className="text-xs text-blue-500 mt-2 font-semibold uppercase tracking-widest opacity-80 group-hover:opacity-100 flex items-center gap-1">
-                    <span>👁 Inspect</span>
+                    <span>👁 Peek & Draw</span>
                   </div>
                 </button>
               );
