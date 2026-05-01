@@ -338,6 +338,7 @@ export default function Client() {
         const newCard: Card = { id: `mock-drawn-${Date.now()}`, suit: 'spades', rank: '7' };
         setLocalHand(prev => [...prev, newCard]);
         setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount - 1 }));
+        window.alert("Mock: 1 card drawn from deck.");
       } else {
         window.alert("Mock: Deck is empty.");
       }
