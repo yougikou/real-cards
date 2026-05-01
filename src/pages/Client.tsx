@@ -248,7 +248,7 @@ export default function Client() {
 
     let cardClasses = 'bg-white hover:-translate-y-1';
     if (isSelected) {
-      cardClasses = 'bg-blue-100 ring-8 ring-blue-500 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(59,130,246,0.6)] z-30';
+      cardClasses = 'bg-yellow-100 ring-8 ring-yellow-400 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30';
     } else if (hasSelection) {
       cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
     } else if (isRecentlyDrawn) {
@@ -262,7 +262,7 @@ export default function Client() {
         className={`relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200 ${cardClasses}`}
       >
         {isSelected && (
-          <div className="absolute -top-3 -right-3 bg-blue-600 border-4 border-white rounded-full w-10 h-10 flex items-center justify-center text-xl font-black text-white z-30 shadow-xl">
+          <div className="absolute -top-4 -right-4 bg-yellow-400 border-4 border-gray-900 rounded-full w-12 h-12 flex items-center justify-center text-2xl font-black text-gray-900 z-30 shadow-2xl">
             {selectedCards.indexOf(card.id) + 1}
           </div>
         )}
@@ -618,7 +618,7 @@ export default function Client() {
           )}
         </div>
 
-        <div className="flex-grow overflow-y-auto pr-2 pb-4">
+        <div className="flex-grow overflow-y-auto pr-2 pb-4 pt-12 px-4">
           {sortMode === 'draw' || sortMode === 'free' ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
               {displayHand.map((card, idx) => renderCard(card, idx))}
@@ -640,6 +640,9 @@ export default function Client() {
               No cards in hand. Swipe down to draw!
             </div>
           )}
+          {/* Spacer inside scroll container for action bar */}
+          {selectedCards.length > 0 && <div className="h-48 flex-shrink-0" />}
+
         </div>
       </div>
 
@@ -723,8 +726,7 @@ export default function Client() {
         </div>
       )}
 
-      {/* Padding to allow scrolling past fixed menu when cards are selected */}
-      {selectedCards.length > 0 && <div className="h-48 flex-shrink-0" />}
+
 
       {/* Other Players Area */}
       {activeGameState && Object.keys(activeGameState.players).length > 1 && (
