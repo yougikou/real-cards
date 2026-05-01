@@ -569,13 +569,15 @@ export default function Client() {
         <div className="mb-2">
           <h2 className="text-lg font-bold flex justify-between items-center mb-2">
             <span>Your Hand ({hand.length})</span>
-            {selectedCards.length > 0 && (
+            {selectedCards.length > 0 ? (
               <button
                  onClick={() => setSelectedCards([])}
                  className="text-sm text-blue-400 bg-gray-800 px-3 py-1 rounded"
               >
                  Clear Selection
               </button>
+            ) : (
+              <span className="text-xs text-gray-500 font-normal">Tap cards to select &amp; act</span>
             )}
           </h2>
           <div className="flex gap-2">
@@ -650,7 +652,7 @@ export default function Client() {
             isDrawing ? 'bg-blue-800 scale-95 opacity-80 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
           }`}
         >
-          {isDrawing ? <span>DRAWING...</span> : <span>DRAW 1</span>}
+          {isDrawing ? <span>DRAWING...</span> : <span>DRAW 1 FROM DECK</span>}
         </button>
         <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
           ↓ (OR SWIPE DOWN)
@@ -672,7 +674,7 @@ export default function Client() {
               className="w-full rounded-xl bg-green-600 px-6 py-3 text-xl font-black text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg mb-1 pointer-events-auto flex items-center justify-center gap-2"
             >
               <span>⬆️</span>
-              <span>PLAY {selectedCards.length} CARD{selectedCards.length > 1 ? 'S' : ''}</span>
+              <span>PLAY {selectedCards.length} TO TABLE</span>
               <span>⬆️</span>
             </button>
             <span className="text-green-400 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none opacity-80">
@@ -690,7 +692,7 @@ export default function Client() {
                 onClick={() => handleReturnSelected(true)}
                 className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1 flex flex-col items-center"
               >
-                <span>⏫ RETURN {selectedCards.length} TO TOP</span>
+                <span>⏫ RETURN {selectedCards.length} TO DECK TOP</span>
                 <span className="text-[9px] opacity-80 font-normal mt-0.5">(Next to be drawn)</span>
               </button>
               <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
@@ -706,7 +708,7 @@ export default function Client() {
                 onClick={() => handleReturnSelected(false)}
                 className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1 flex flex-col items-center"
               >
-                <span>⏬ RETURN {selectedCards.length} TO BOTTOM</span>
+                <span>⏬ RETURN {selectedCards.length} TO DECK BOTTOM</span>
                 <span className="text-[9px] opacity-80 font-normal mt-0.5">(Bury under deck)</span>
               </button>
               <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
