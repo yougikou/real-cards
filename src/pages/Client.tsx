@@ -3,6 +3,8 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useClient } from '../hooks/useClient';
 import type { Card, Suit, Rank } from '../types';
 import { playDrawSound } from '../utils/audio/draw';
+import { playCardSound } from '../utils/audio/playCard';
+import { playReturnSound } from '../utils/audio/returnCard';
 
 const SUIT_ORDER: Record<Suit, number> = {
   hearts: 1,
@@ -195,6 +197,11 @@ export default function Client() {
   const handlePlaySelected = () => {
     const cardsToPlay = displayHand.filter(c => selectedCards.includes(c.id));
     if (cardsToPlay.length > 0) {
+      if (navigator.vibrate) {
+        navigator.vibrate(20);
+      }
+      playCardSound();
+
       if (isPreview) {
         setLocalHand(prev => prev.filter(c => !cardsToPlay.map(sc => sc.id).includes(c.id)));
         setLocalGameState(prev => ({
@@ -211,6 +218,11 @@ export default function Client() {
   const handleReturnSelected = (toTop: boolean) => {
     const cardsToReturn = displayHand.filter(c => selectedCards.includes(c.id));
     if (cardsToReturn.length > 0) {
+      if (navigator.vibrate) {
+        navigator.vibrate(15);
+      }
+      playReturnSound();
+
       if (isPreview) {
         setLocalHand(prev => prev.filter(c => !cardsToReturn.map(sc => sc.id).includes(c.id)));
         setLocalGameState(prev => ({

@@ -1,6 +1,6 @@
 let audioCtx: AudioContext | null = null;
 
-export function playDrawSound() {
+export function playCardSound() {
   try {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
@@ -14,7 +14,7 @@ export function playDrawSound() {
     }
 
     const ctx = audioCtx;
-    const bufferSize = ctx.sampleRate * 0.1; // 0.1 seconds
+    const bufferSize = ctx.sampleRate * 0.15; // 0.15 seconds
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
 
@@ -27,14 +27,14 @@ export function playDrawSound() {
 
     const gainNode = ctx.createGain();
 
-    // Short, snappy envelope for a single card draw
+    // Thud envelope: very fast attack, fast decay
     gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0.7, ctx.currentTime + 0.005);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
 
     const filter = ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 4000;
+    filter.type = 'lowpass';
+    filter.frequency.value = 800; // Lower frequency for a "thud" or "slap"
 
     noiseSource.connect(filter);
     filter.connect(gainNode);
@@ -42,7 +42,7 @@ export function playDrawSound() {
 
     noiseSource.start();
   } catch (err) {
-    // Fail silently if audio context is not supported or suspended by policy
+    // Fail silently
     console.warn("Audio playback failed:", err);
   }
 }
