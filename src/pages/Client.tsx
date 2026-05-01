@@ -263,7 +263,7 @@ export default function Client() {
       >
         {isSelected && (
           <div className="absolute -top-3 -right-3 bg-blue-600 border-4 border-white rounded-full w-10 h-10 flex items-center justify-center text-xl font-black text-white z-30 shadow-xl">
-            ✓
+            {selectedCards.indexOf(card.id) + 1}
           </div>
         )}
         <div className={`text-lg font-bold ${color}`}>{card.rank}</div>
@@ -571,12 +571,15 @@ export default function Client() {
           <h2 className="text-lg font-bold flex justify-between items-center mb-2">
             <span>Your Hand ({hand.length})</span>
             {selectedCards.length > 0 ? (
-              <button
-                 onClick={() => setSelectedCards([])}
-                 className="text-sm text-blue-400 bg-gray-800 px-3 py-1 rounded"
-              >
-                 Clear Selection
-              </button>
+              <div className="flex items-center">
+                <button
+                   onClick={() => setSelectedCards([])}
+                   className="text-sm text-blue-400 bg-gray-800 px-3 py-1 rounded"
+                >
+                   Clear Selection
+                </button>
+                <span className="text-xs text-yellow-400 font-bold animate-pulse ml-2">↓ CHOOSE ACTION BELOW ↓</span>
+              </div>
             ) : (
               <span className="text-xs text-gray-500 font-normal">Tap cards to select &amp; act</span>
             )}
@@ -662,8 +665,8 @@ export default function Client() {
 
       {selectedCards.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 border-t-2 border-yellow-400 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 flex flex-col gap-3 pb-safe">
-          <div className="text-yellow-400 text-xs font-bold uppercase tracking-wider text-center -mb-1">
-            Actions for {selectedCards.length} selected card{selectedCards.length > 1 ? 's' : ''}
+          <div className="text-yellow-400 text-xs font-bold uppercase tracking-wider text-center -mb-1 animate-pulse">
+            <span>↓ Actions for {selectedCards.length} selected card{selectedCards.length > 1 ? 's' : ''} ↓</span>
           </div>
           <div
             className="w-full border-2 border-green-500 rounded-xl flex flex-col items-center justify-center bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-3"
