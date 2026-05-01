@@ -86,7 +86,7 @@ export default function Host() {
 
         <div className="flex-grow flex items-center justify-center pointer-events-none relative">
           {/* Play Area Overlay */}
-          <div className="relative w-64 h-64 flex items-center justify-center">
+          <div className="relative w-64 h-64 flex items-center justify-center -translate-y-24">
             {gameState.playStack.map((batch, batchIndex) => {
               // Offset each batch slightly so we can see the stack
               const offsetX = batchIndex * 10;
@@ -114,7 +114,7 @@ export default function Host() {
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent('host-return-batch', { detail: { toTop: true } }));
                           }}
-                          className="bg-black/80 hover:bg-black text-white text-[10px] px-2 py-0.5 rounded border border-white/30 transition-colors whitespace-nowrap"
+                          className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded border border-blue-400/50 transition-colors whitespace-nowrap shadow-md"
                         >
                           ↑ Return to Deck Top
                         </button>
@@ -123,7 +123,7 @@ export default function Host() {
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent('host-return-batch', { detail: { toTop: false } }));
                           }}
-                          className="bg-black/80 hover:bg-black text-white text-[10px] px-2 py-0.5 rounded border border-white/30 transition-colors whitespace-nowrap"
+                          className="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-0.5 rounded border border-slate-500/50 transition-colors whitespace-nowrap shadow-md"
                         >
                           ↓ Return to Deck Bottom
                         </button>
@@ -156,8 +156,9 @@ export default function Host() {
               );
             })}
             {gameState.playStack.length === 0 && (
-              <div className="text-white/20 font-bold text-2xl uppercase tracking-widest border-2 border-dashed border-white/20 p-8 rounded-xl">
-                Play Area
+              <div className="text-emerald-300/50 font-bold text-2xl uppercase tracking-widest border-2 border-dashed border-emerald-400/30 bg-black/20 px-8 py-12 rounded-2xl flex flex-col items-center">
+                <span>Public Table</span>
+                <span className="text-sm font-normal mt-2 text-emerald-300/20 text-center normal-case tracking-normal">Played cards will<br/>appear here</span>
               </div>
             )}
             <div className="absolute -bottom-16 text-center z-10 pointer-events-none flex flex-col items-center">
@@ -170,7 +171,7 @@ export default function Host() {
               {gameState.playStack.length > 0 ? (
                 <button
                   onClick={() => window.dispatchEvent(new Event('host-clear-table'))}
-                  className="pointer-events-auto bg-amber-500 hover:bg-amber-400 text-black px-6 py-2 rounded-full border-2 border-amber-300 text-sm uppercase tracking-wider font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.5)] active:scale-95"
+                  className="pointer-events-auto bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-black px-6 py-2 rounded-full border-2 border-amber-200 text-sm uppercase tracking-wider font-bold transition-all shadow-[0_0_20px_rgba(245,158,11,0.6)] active:scale-95"
                 >
                   Clear Area to Discard ↓
                 </button>
@@ -189,7 +190,7 @@ export default function Host() {
         <div className="absolute top-4 right-4 flex gap-4 pointer-events-auto">
           {/* Discard Pile */}
           <div
-            className={`w-32 h-48 bg-gray-800 rounded-xl shadow-lg border-2 border-gray-600 flex flex-col items-center justify-center transition-opacity ${gameState.discardPile.length > 0 ? 'opacity-100' : 'opacity-50'}`}
+            className={`w-32 h-48 rounded-xl shadow-lg border-2 flex flex-col items-center justify-center transition-opacity ${gameState.discardPile.length > 0 ? 'opacity-100 border-solid border-gray-400 bg-gray-800' : 'opacity-50 border-dashed border-gray-500 bg-gray-900/80'}`}
           >
             <div className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-widest">Discard</div>
             <div className="text-2xl font-black text-gray-500">{gameState.discardPile.length}</div>
@@ -208,7 +209,7 @@ export default function Host() {
                 </span>
               </div>
             )}
-            {gameState.discardPile.length === 0 && <div className="text-gray-600 text-xs mt-2">(Empty)</div>}
+            {gameState.discardPile.length === 0 && <div className="text-gray-500 text-xs mt-2 font-medium">Drop here to clear</div>}
           </div>
 
           {/* Deck */}
@@ -218,11 +219,11 @@ export default function Host() {
                 window.dispatchEvent(new Event('host-draw-to-table'));
               }
             }}
-            className={`w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center transition-colors ${gameState.deckCount > 0 ? 'cursor-pointer hover:bg-blue-800 active:scale-95' : 'opacity-50'}`}
+            className={`w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center transition-colors ring-2 ring-blue-400/50 hover:ring-blue-300 ${gameState.deckCount > 0 ? 'cursor-pointer hover:bg-blue-800 active:scale-95' : 'opacity-50'}`}
           >
             <div className="text-white/80 font-bold mb-2">Deck</div>
             <div className="text-3xl font-black">{gameState.deckCount}</div>
-            {gameState.deckCount > 0 && <div className="text-white/60 text-xs mt-2 text-center">Tap to draw<br/>to table</div>}
+            {gameState.deckCount > 0 && <div className="text-blue-100 font-bold bg-black/50 px-2 py-1 rounded shadow text-xs mt-2 text-center">Tap to draw<br/>to table</div>}
           </div>
 
           {/* Reset & Shuffle (Discard) */}

@@ -256,14 +256,14 @@ class TableScene extends Phaser.Scene {
       } else {
         zone.mappedPlayerId = undefined;
         if (zone.text) {
-          zone.text.setText(`[ ${zone.defaultText} ]\nWaiting for player...`);
+          zone.text.setText(`[ ${zone.defaultText} ]\nDROP TO DEAL`);
           zone.text.setColor('#888888');
           zone.text.setFontStyle('normal');
-          zone.text.setAlpha(this.dragCard ? 0.1 : 0.3);
+          zone.text.setAlpha(this.dragCard ? 0.1 : 0.5);
         }
         if (zone.rect) {
           zone.rect.setFillStyle(0x000000, 0.1);
-          zone.rect.setStrokeStyle(2, 0xffffff, this.dragCard ? 0.1 : 0.3);
+          zone.rect.setStrokeStyle(2, 0xffffff, this.dragCard ? 0.1 : 0.5);
         }
       }
     }
@@ -288,7 +288,7 @@ class TableScene extends Phaser.Scene {
       this.deckSprites.push(card);
     }
 
-    this.deckText = this.add.text(deckX, deckY + 60, 'DRAG TO DEAL\nTO SEATS', { color: '#ffffff', fontSize: '14px', align: 'center' }).setOrigin(0.5).setAlpha(0.5);
+    this.deckText = this.add.text(deckX, deckY + 60, 'DRAG TO DEAL\nTO SEATS', { color: '#fbbf24', fontSize: '14px', align: 'center', backgroundColor: '#000000', padding: { x: 8, y: 4 } }).setOrigin(0.5).setAlpha(0.9);
   }
 
   private spawnAndDragCard(pointer: Phaser.Input.Pointer, startX: number, startY: number) {
