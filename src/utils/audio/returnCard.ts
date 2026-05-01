@@ -1,6 +1,6 @@
 let audioCtx: AudioContext | null = null;
 
-export function playDrawSound() {
+export function playReturnSound() {
   try {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
@@ -14,7 +14,7 @@ export function playDrawSound() {
     }
 
     const ctx = audioCtx;
-    const bufferSize = ctx.sampleRate * 0.1; // 0.1 seconds
+    const bufferSize = ctx.sampleRate * 0.2; // 0.2 seconds
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
 
@@ -27,14 +27,18 @@ export function playDrawSound() {
 
     const gainNode = ctx.createGain();
 
-    // Short, snappy envelope for a single card draw
+    // Double rustle envelope for returning cards
     gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+
+    gainNode.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
 
     const filter = ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 4000;
+    filter.type = 'bandpass';
+    filter.frequency.value = 2500;
+    filter.Q.value = 1.0;
 
     noiseSource.connect(filter);
     filter.connect(gainNode);
@@ -42,7 +46,7 @@ export function playDrawSound() {
 
     noiseSource.start();
   } catch (err) {
-    // Fail silently if audio context is not supported or suspended by policy
+    // Fail silently
     console.warn("Audio playback failed:", err);
   }
 }
