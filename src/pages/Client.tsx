@@ -561,10 +561,10 @@ export default function Client() {
         onTouchEnd={handleSwipeUpPlay}
       >
         <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none mb-1">
-          Play Zone
+          ↑ SWIPE UP TO PLAY
         </span>
         <span className="text-gray-600 text-xs text-center pointer-events-none">
-          Select cards to Play (or play to discard)
+          Drag selected cards upward
         </span>
       </div>
 
@@ -697,18 +697,18 @@ export default function Client() {
         onTouchStart={handleTouchStart}
         onTouchEnd={(e) => handleSwipeDownDrawReturn(e)}
       >
+        <span className="text-blue-400 font-black text-xl mb-2 pointer-events-none">
+          ↓ SWIPE DOWN TO DRAW
+        </span>
         <button
           onClick={handleDrawAction}
           disabled={isDrawing}
-          className={`rounded-lg px-6 py-3 text-lg font-bold text-white transition-all shadow-lg mb-1 pointer-events-auto flex items-center justify-center gap-2 ${
-            isDrawing ? 'bg-blue-800 scale-95 opacity-80 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
+          className={`rounded-lg px-4 py-2 text-sm font-bold text-white transition-all shadow-lg pointer-events-auto flex items-center justify-center gap-2 opacity-50 hover:opacity-100 ${
+            isDrawing ? 'bg-blue-800 scale-95 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
           }`}
         >
-          {isDrawing ? <span>DRAWING...</span> : <span>DRAW 1 FROM DECK</span>}
+          {isDrawing ? <span>DRAWING...</span> : <span>TAP TO DRAW</span>}
         </button>
-        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
-          ↓ (OR SWIPE DOWN)
-        </span>
       </div>
 
       {selectedCards.length > 0 && (
@@ -721,17 +721,21 @@ export default function Client() {
             onTouchStart={handleTouchStart}
             onTouchEnd={handleSwipeUpPlay}
           >
+            <span className="text-green-400 font-black text-xl mb-2 pointer-events-none">
+              ↑ SWIPE UP TO PLAY
+            </span>
             <button
               onClick={handlePlaySelected}
-              className="w-full rounded-xl bg-green-600 px-6 py-3 text-xl font-black text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg mb-1 pointer-events-auto flex items-center justify-center gap-2"
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg pointer-events-auto flex items-center justify-center gap-2 opacity-70 hover:opacity-100"
             >
-              <span>⬆️</span>
-              <span>PLAY {selectedCards.length} TO TABLE</span>
-              <span>⬆️</span>
+              <span>TAP TO PLAY</span>
             </button>
-            <span className="text-green-400 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none opacity-80">
-              TAP ABOVE OR SWIPE UP TO PLAY (OR DISCARD)
-            </span>
+          </div>
+
+          <div className="w-full text-center">
+             <span className="text-blue-400 font-black text-xl mb-2 pointer-events-none">
+               ↓ SWIPE DOWN TO RETURN
+             </span>
           </div>
 
           <div className="flex gap-2 w-full">
@@ -742,14 +746,10 @@ export default function Client() {
             >
               <button
                 onClick={() => handleReturnSelected(true)}
-                className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1 flex flex-col items-center"
+                className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto flex flex-col items-center opacity-70 hover:opacity-100"
               >
-                <span>⏫ RETURN {selectedCards.length} TO DECK TOP</span>
-                <span className="text-[9px] opacity-80 font-normal mt-0.5">(Next to be drawn)</span>
+                <span>TAP TO RETURN TOP</span>
               </button>
-              <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
-                ↓ SWIPE DOWN
-              </span>
             </div>
             <div
               className="flex-1 border border-gray-500 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-2 py-2"
@@ -758,14 +758,10 @@ export default function Client() {
             >
                <button
                 onClick={() => handleReturnSelected(false)}
-                className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1 flex flex-col items-center"
+                className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto flex flex-col items-center opacity-70 hover:opacity-100"
               >
-                <span>⏬ RETURN {selectedCards.length} TO DECK BOTTOM</span>
-                <span className="text-[9px] opacity-80 font-normal mt-0.5">(Bury under deck)</span>
+                <span>TAP TO RETURN BOTTOM</span>
               </button>
-              <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
-                ↓ SWIPE DOWN
-              </span>
             </div>
           </div>
         </div>
