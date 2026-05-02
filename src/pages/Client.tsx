@@ -703,11 +703,11 @@ export default function Client() {
         <button
           onClick={handleDrawAction}
           disabled={isDrawing}
-          className={`rounded-lg px-4 py-2 text-sm font-bold text-white transition-all shadow-lg pointer-events-auto flex items-center justify-center gap-2 opacity-50 hover:opacity-100 ${
-            isDrawing ? 'bg-blue-800 scale-95 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
+          className={`px-4 py-1 text-xs transition-all pointer-events-auto flex items-center justify-center gap-2 underline ${
+            isDrawing ? 'text-gray-500 cursor-wait' : 'text-gray-500 hover:text-white active:scale-95'
           }`}
         >
-          {isDrawing ? <span>DRAWING...</span> : <span>TAP TO DRAW</span>}
+          {isDrawing ? <span>(drawing...)</span> : <span>(or tap to draw)</span>}
         </button>
       </div>
 
@@ -726,9 +726,9 @@ export default function Client() {
             </span>
             <button
               onClick={handlePlaySelected}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg pointer-events-auto flex items-center justify-center gap-2 opacity-70 hover:opacity-100"
+              className="px-4 py-1 text-xs transition-all pointer-events-auto flex items-center justify-center gap-2 underline text-gray-400 hover:text-white active:scale-95"
             >
-              <span>TAP TO PLAY</span>
+              <span>(or tap to play)</span>
             </button>
           </div>
 
@@ -744,11 +744,12 @@ export default function Client() {
               onTouchStart={handleTouchStart}
               onTouchEnd={(e) => handleSwipeDownDrawReturn(e, true)}
             >
+              <span className="text-blue-400 font-bold text-sm mb-1 pointer-events-none">TO DECK TOP</span>
               <button
                 onClick={() => handleReturnSelected(true)}
-                className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto flex flex-col items-center opacity-70 hover:opacity-100"
+                className="w-full px-2 py-1 text-xs transition-all pointer-events-auto flex flex-col items-center underline text-gray-400 hover:text-white active:scale-95"
               >
-                <span>TAP TO RETURN TOP</span>
+                <span>(or tap to return to top)</span>
               </button>
             </div>
             <div
@@ -756,11 +757,12 @@ export default function Client() {
               onTouchStart={handleTouchStart}
               onTouchEnd={(e) => handleSwipeDownDrawReturn(e, false)}
             >
+               <span className="text-gray-400 font-bold text-sm mb-1 pointer-events-none">TO DECK BOTTOM</span>
                <button
                 onClick={() => handleReturnSelected(false)}
-                className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto flex flex-col items-center opacity-70 hover:opacity-100"
+                className="w-full px-2 py-1 text-xs transition-all pointer-events-auto flex flex-col items-center underline text-gray-400 hover:text-white active:scale-95"
               >
-                <span>TAP TO RETURN BOTTOM</span>
+                <span>(or tap to return to bottom)</span>
               </button>
             </div>
           </div>
