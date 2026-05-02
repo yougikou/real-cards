@@ -92,6 +92,7 @@ export default function Client() {
 
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [viewOther, setViewOther] = useState<string | null>(null);
+  const [stolenCardResult, setStolenCardResult] = useState<Card | null>(null);
 
   // Draw feedback state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -115,10 +116,10 @@ export default function Client() {
       const newCardIds = newCards.map(c => c.id);
       setRecentlyDrawnCardIds(prev => [...prev, ...newCardIds]);
 
-      // Clear highlight after 800ms
+      // Clear highlight after 2500ms
       setTimeout(() => {
         setRecentlyDrawnCardIds(prev => prev.filter(id => !newCardIds.includes(id)));
-      }, 800);
+      }, 2500);
     }
 
     previousHandRef.current = hand;
@@ -260,7 +261,7 @@ export default function Client() {
 
     let cardClasses = 'bg-white hover:-translate-y-1';
     if (isSelected) {
-      cardClasses = 'bg-yellow-100 ring-8 ring-yellow-400 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30';
+      cardClasses = 'bg-yellow-200 ring-8 ring-yellow-500 -translate-y-12 scale-125 shadow-[0_0_40px_rgba(234,179,8,0.8)] z-30';
     } else if (hasSelection) {
       cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
     } else if (isRecentlyDrawn) {
@@ -423,7 +424,10 @@ export default function Client() {
       <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
         <div className="flex items-center mb-6">
           <button
-            onClick={() => setViewOther(null)}
+            onClick={() => {
+              setViewOther(null);
+              setStolenCardResult(null);
+            }}
             className="text-blue-400 font-bold flex items-center gap-1 bg-gray-800 px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
           >
             ← Back
@@ -433,19 +437,46 @@ export default function Client() {
           </div>
         </div>
 
-        <div className="bg-blue-900/40 border border-blue-500/50 rounded-xl p-4 mb-8 text-center">
-          <h2 className="text-2xl font-black text-white mb-2">{targetPlayer.name}'s Hidden Hand</h2>
-          <p className="text-sm text-blue-200">
-            You are secretly viewing this player's cards.<br/>
-            <span className="font-bold text-yellow-400">Tap a card to steal it into your hand!</span>
-          </p>
-        </div>
+        {stolenCardResult ? (
+          <div className="flex-1 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
+            <h2 className="text-3xl font-black text-green-400 mb-2">Blind Steal Successful!</h2>
+            <p className="text-gray-300 mb-8 text-center px-4">
+              You randomly selected this card from {targetPlayer.name}'s hand.<br/>
+              <span className="text-yellow-400 font-bold">It has been added to your hand.</span>
+            </p>
+            <div className="w-48 mb-10 transform scale-125">
+              {renderCard(stolenCardResult, -1)}
+            </div>
+            <button
+              onClick={() => {
+                setStolenCardResult(null);
+                setViewOther(null);
+              }}
+              className="bg-green-600 hover:bg-green-500 text-white font-black text-xl py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.4)] active:scale-95 transition-all w-full max-w-xs"
+            >
+              BACK TO HAND
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="bg-blue-900/40 border border-blue-500/50 rounded-xl p-4 mb-8 text-center">
+              <h2 className="text-2xl font-black text-white mb-2">{targetPlayer.name}'s Hidden Hand</h2>
+              <p className="text-sm text-blue-200">
+                You cannot see the card faces (Blind Draw).<br/>
+                <span className="font-bold text-yellow-400">Tap a card back to randomly steal it!</span>
+              </p>
+            </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 flex-grow content-start">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 flex-grow content-start">
           {Array.from({ length: targetPlayer.handCount }).map((_, i) => (
             <div
               key={i}
               onClick={() => {
+                if (navigator.vibrate) {
+                  navigator.vibrate(15);
+                }
+                playDrawSound();
+
                 if (isPreview) {
                   const newCard: Card = { id: `mock-stolen-${Date.now()}`, suit: 'none', rank: 'JOKER' };
                   setLocalHand(prev => [...prev, newCard]);
@@ -456,15 +487,15 @@ export default function Client() {
                     }
                     return { ...prev, players: newPlayers };
                   });
-                  window.alert("Mock: 1 card stolen from opponent's hand.");
+                  setStolenCardResult(newCard);
                 } else {
                   // In a real app we'd need to know the hidden card ID,
                   // but since we only have count on client, we need a way for host to pick random.
                   // For simplicity in this demo, since client doesn't have IDs of other's cards,
                   // let's pass an empty string and let Host pick a random one if ID is empty.
                   drawFromOther(viewOther, '');
+                  setViewOther(null);
                 }
-                setViewOther(null);
               }}
               className="group relative aspect-[2/3] bg-blue-800 rounded-lg border-2 border-white/20 flex items-center justify-center cursor-pointer hover:bg-blue-600 hover:border-yellow-400 hover:-translate-y-1 transition-all shadow-md overflow-hidden"
             >
@@ -480,6 +511,8 @@ export default function Client() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     );
   }
@@ -496,7 +529,7 @@ export default function Client() {
             onClick={() => setViewOther('mock-peer-1')}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 px-4 rounded shadow transition-colors active:scale-95 text-sm"
           >
-            Inspect Alice
+            Blind Steal Alice
           </button>
         </div>
       )}
@@ -743,7 +776,7 @@ export default function Client() {
       {/* Other Players Area */}
       {activeGameState && Object.keys(activeGameState.players).length > 1 && (
         <div className="mt-4 pt-4 border-t border-gray-800">
-          <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players (Peek & Draw)</h2>
+          <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players (Blind Steal)</h2>
           <div className="flex overflow-x-auto gap-3 pb-2">
             {Object.values(activeGameState.players).map(p => {
               if (p.id === peerId) return null;
@@ -760,7 +793,7 @@ export default function Client() {
                     <div className="text-xs text-gray-400 mt-1">{p.handCount} cards</div>
                   </div>
                   <div className="text-xs text-blue-500 mt-2 font-semibold uppercase tracking-widest opacity-80 group-hover:opacity-100 flex items-center gap-1">
-                    <span>👁 Peek & Draw</span>
+                    <span>👁 Blind Steal</span>
                   </div>
                 </button>
               );
