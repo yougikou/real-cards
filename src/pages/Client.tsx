@@ -260,7 +260,7 @@ export default function Client() {
 
     let cardClasses = 'bg-white hover:-translate-y-1';
     if (isSelected) {
-      cardClasses = 'bg-yellow-100 ring-8 ring-yellow-400 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30';
+      cardClasses = 'bg-yellow-100 ring-[8px] ring-yellow-400 -translate-y-12 scale-110 shadow-[0_0_40px_rgba(250,204,21,0.8)] z-30';
     } else if (hasSelection) {
       cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
     } else if (isRecentlyDrawn) {
@@ -274,7 +274,8 @@ export default function Client() {
         className={`relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200 ${cardClasses}`}
       >
         {isSelected && (
-          <div className="absolute -top-4 -right-4 bg-yellow-400 border-4 border-gray-900 rounded-full w-12 h-12 flex items-center justify-center text-2xl font-black text-gray-900 z-30 shadow-2xl">
+          <div className="absolute -top-5 -right-5 bg-yellow-400 border-4 border-gray-900 rounded-full w-14 h-14 flex items-center justify-center text-2xl font-black text-gray-900 z-30 shadow-[0_0_20px_rgba(250,204,21,1)]">
+              <span className="absolute -top-1 -right-1 text-sm bg-green-500 text-white rounded-full w-6 h-6 border-2 border-gray-900 flex items-center justify-center">✓</span>
             {selectedCards.indexOf(card.id) + 1}
           </div>
         )}
@@ -582,6 +583,11 @@ export default function Client() {
         <div className="mb-2">
           <h2 className="text-lg font-bold flex justify-between items-center mb-2">
             <span>Your Hand ({hand.length})</span>
+            {selectedCards.length > 0 && (
+              <span className="ml-2 bg-yellow-400 text-gray-900 px-2 py-1 rounded shadow-lg font-black text-sm whitespace-nowrap">
+                ✓ {selectedCards.length} SELECTED
+              </span>
+            )}
             {selectedCards.length > 0 ? (
               <div className="flex items-center">
                 <button
@@ -681,7 +687,7 @@ export default function Client() {
       {selectedCards.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 border-t-2 border-yellow-400 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 flex flex-col gap-3 pb-safe">
           <div className="text-yellow-400 text-xs font-bold uppercase tracking-wider text-center -mb-1 animate-pulse">
-            <span>↓ Actions for {selectedCards.length} selected card{selectedCards.length > 1 ? 's' : ''} ↓</span>
+            <span>↓ ACTIONS FOR {selectedCards.length} SELECTED CARD{selectedCards.length > 1 ? 'S' : ''} ↓</span>
           </div>
           <div
             className="w-full border-2 border-green-500 rounded-xl flex flex-col items-center justify-center bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-3"
