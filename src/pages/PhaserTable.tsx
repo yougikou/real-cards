@@ -288,7 +288,7 @@ class TableScene extends Phaser.Scene {
       this.deckSprites.push(card);
     }
 
-    this.deckText = this.add.text(deckX, deckY + 60, 'DRAG TO DEAL\nTO SEATS', { color: '#fbbf24', fontSize: '14px', align: 'center', backgroundColor: '#000000', padding: { x: 8, y: 4 } }).setOrigin(0.5).setAlpha(0.9);
+    this.deckText = this.add.text(deckX, deckY + 60, 'CENTER DECK\nDRAG TO DEAL', { color: '#fbbf24', fontSize: '14px', align: 'center', backgroundColor: '#000000', padding: { x: 8, y: 4 } }).setOrigin(0.5).setAlpha(0.9);
   }
 
   private spawnAndDragCard(pointer: Phaser.Input.Pointer, startX: number, startY: number) {
