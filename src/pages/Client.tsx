@@ -97,6 +97,7 @@ export default function Client() {
   // Draw feedback state
   const [isDrawing, setIsDrawing] = useState(false);
   const [recentlyDrawnCardIds, setRecentlyDrawnCardIds] = useState<string[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Gesture state
   const [touchStartY, setTouchStartY] = useState(0);
@@ -112,18 +113,20 @@ export default function Client() {
     // Find newly added cards (cards in current hand that were not in previous hand)
     const newCards = hand.filter(card => !previousHand.some(prev => prev.id === card.id));
 
-    if (newCards.length > 0) {
+    if (newCards.length > 0 && !viewOther) {
       const newCardIds = newCards.map(c => c.id);
       setRecentlyDrawnCardIds(prev => [...prev, ...newCardIds]);
+      setToastMessage(`+${newCards.length} Card${newCards.length > 1 ? 's' : ''}`);
 
-      // Clear highlight after 800ms
+      // Clear highlight and toast after 4000ms
       setTimeout(() => {
         setRecentlyDrawnCardIds(prev => prev.filter(id => !newCardIds.includes(id)));
-      }, 800);
+        setToastMessage(null);
+      }, 4000);
     }
 
     previousHandRef.current = hand;
-  }, [hand]);
+  }, [hand, viewOther]);
 
   // Update custom order when hand changes but do not cause cascading renders
   React.useEffect(() => {
@@ -265,7 +268,7 @@ export default function Client() {
     } else if (hasSelection) {
       cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
     } else if (isRecentlyDrawn) {
-      cardClasses = 'bg-green-50 ring-4 ring-green-400 scale-105 shadow-[0_0_20px_rgba(74,222,128,0.5)] z-20 -translate-y-2';
+      cardClasses = 'bg-green-200 ring-8 ring-green-500 scale-110 shadow-[0_0_40px_rgba(34,197,94,0.8)] z-20 -translate-y-8';
     }
 
     return (
@@ -277,6 +280,11 @@ export default function Client() {
         {isSelected && (
           <div className="absolute -top-4 -right-4 bg-yellow-400 border-4 border-gray-900 rounded-full w-12 h-12 flex items-center justify-center text-2xl font-black text-gray-900 z-30 shadow-2xl">
             {selectedCards.indexOf(card.id) + 1}
+          </div>
+        )}
+        {isRecentlyDrawn && !isSelected && (
+          <div className="absolute -top-4 -right-4 bg-green-500 border-4 border-gray-900 rounded-full w-12 h-12 flex items-center justify-center text-[11px] font-black text-white z-30 shadow-2xl animate-pulse">
+            NEW
           </div>
         )}
         <div className={`text-lg font-bold ${color}`}>{card.rank}</div>
@@ -449,8 +457,16 @@ export default function Client() {
             </div>
             <button
               onClick={() => {
+                const stolenId = stolenCardResult.id;
                 setStolenCardResult(null);
                 setViewOther(null);
+                // Manually trigger the visual feedback for returning from steal
+                setRecentlyDrawnCardIds(prev => [...prev, stolenId]);
+                setToastMessage('+1 Card Stolen');
+                setTimeout(() => {
+                  setRecentlyDrawnCardIds(prev => prev.filter(id => id !== stolenId));
+                  setToastMessage(null);
+                }, 4000);
               }}
               className="bg-green-600 hover:bg-green-500 text-white font-black text-xl py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.4)] active:scale-95 transition-all w-full max-w-xs"
             >
@@ -518,7 +534,14 @@ export default function Client() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
+    <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col relative overflow-hidden">
+      {toastMessage && (
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="bg-green-500 text-white px-6 py-3 rounded-full font-black text-xl shadow-[0_0_30px_rgba(34,197,94,0.5)] border-2 border-green-300 whitespace-nowrap">
+            {toastMessage}
+          </div>
+        </div>
+      )}
       {isPreview && (
         <div className="bg-purple-900/40 border-2 border-purple-500 border-dashed rounded-lg p-3 mb-4 flex justify-between items-center shadow-lg">
           <div className="flex flex-col">
