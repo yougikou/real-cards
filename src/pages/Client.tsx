@@ -97,6 +97,7 @@ export default function Client() {
   // Draw feedback state
   const [isDrawing, setIsDrawing] = useState(false);
   const [recentlyDrawnCardIds, setRecentlyDrawnCardIds] = useState<string[]>([]);
+  const [undoMessage, setUndoMessage] = useState<string | null>(null);
 
   // Gesture state
   const [touchStartY, setTouchStartY] = useState(0);
@@ -241,6 +242,10 @@ export default function Client() {
   const handleTakeBack = () => {
     if (activeGameState && activeGameState.playStack.length > 0) {
       const topBatch = activeGameState.playStack[activeGameState.playStack.length - 1];
+
+      setUndoMessage(`UNDO: ${topBatch.length} card${topBatch.length > 1 ? 's' : ''} returned to hand.`);
+      setTimeout(() => setUndoMessage(null), 3000);
+
       if (isPreview) {
         setLocalGameState(prev => ({
           ...prev,
@@ -261,7 +266,7 @@ export default function Client() {
 
     let cardClasses = 'bg-white hover:-translate-y-1';
     if (isSelected) {
-      cardClasses = 'bg-yellow-100 ring-8 ring-yellow-400 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30';
+      cardClasses = 'bg-yellow-300 ring-8 ring-yellow-500 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30';
     } else if (hasSelection) {
       cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
     } else if (isRecentlyDrawn) {
@@ -611,7 +616,14 @@ export default function Client() {
       )}
 
       {/* Hand Area */}
-      <div className="flex-grow flex flex-col">
+      <div className="flex-grow flex flex-col relative">
+        {undoMessage && (
+          <div className="absolute top-0 left-0 right-0 z-40 flex justify-center -mt-2">
+            <div className="bg-yellow-500 text-gray-900 px-4 py-2 rounded-full shadow-lg font-black text-sm uppercase tracking-wider animate-bounce">
+              {undoMessage}
+            </div>
+          </div>
+        )}
         <div className="mb-2">
           <h2 className="text-lg font-bold flex justify-between items-center mb-2">
             <span>Your Hand ({hand.length})</span>
@@ -703,18 +715,20 @@ export default function Client() {
         <button
           onClick={handleDrawAction}
           disabled={isDrawing}
-          className={`rounded-lg px-4 py-2 text-sm font-bold text-white transition-all shadow-lg pointer-events-auto flex items-center justify-center gap-2 opacity-50 hover:opacity-100 ${
-            isDrawing ? 'bg-blue-800 scale-95 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
+          className={`px-4 py-1 text-xs transition-all pointer-events-auto flex items-center justify-center gap-2 underline ${
+            isDrawing ? 'text-gray-500 cursor-wait' : 'text-gray-500 hover:text-white active:scale-95'
           }`}
         >
-          {isDrawing ? <span>DRAWING...</span> : <span>TAP TO DRAW</span>}
+          {isDrawing ? <span>(drawing...)</span> : <span>(or tap to draw)</span>}
         </button>
       </div>
 
       {selectedCards.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 border-t-2 border-yellow-400 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 flex flex-col gap-3 pb-safe">
-          <div className="text-yellow-400 text-xs font-bold uppercase tracking-wider text-center -mb-1 animate-pulse">
-            <span>↓ Actions for {selectedCards.length} selected card{selectedCards.length > 1 ? 's' : ''} ↓</span>
+          <div className="text-center -mb-1">
+            <span className="bg-yellow-500 text-gray-900 rounded px-3 py-1 text-sm font-black uppercase tracking-wider inline-block shadow-md">
+              ↓ Actions for {selectedCards.length} selected card{selectedCards.length > 1 ? 's' : ''} ↓
+            </span>
           </div>
           <div
             className="w-full border-2 border-green-500 rounded-xl flex flex-col items-center justify-center bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-3"
@@ -726,9 +740,9 @@ export default function Client() {
             </span>
             <button
               onClick={handlePlaySelected}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg pointer-events-auto flex items-center justify-center gap-2 opacity-70 hover:opacity-100"
+              className="px-4 py-1 text-xs transition-all pointer-events-auto flex items-center justify-center gap-2 underline text-gray-400 hover:text-white active:scale-95"
             >
-              <span>TAP TO PLAY</span>
+              <span>(or tap to play)</span>
             </button>
           </div>
 
@@ -744,11 +758,12 @@ export default function Client() {
               onTouchStart={handleTouchStart}
               onTouchEnd={(e) => handleSwipeDownDrawReturn(e, true)}
             >
+              <span className="text-blue-400 font-bold text-sm mb-1 pointer-events-none">TO DECK TOP</span>
               <button
                 onClick={() => handleReturnSelected(true)}
-                className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto flex flex-col items-center opacity-70 hover:opacity-100"
+                className="w-full px-2 py-1 text-xs transition-all pointer-events-auto flex flex-col items-center underline text-gray-400 hover:text-white active:scale-95"
               >
-                <span>TAP TO RETURN TOP</span>
+                <span>(or tap to return to top)</span>
               </button>
             </div>
             <div
@@ -756,11 +771,12 @@ export default function Client() {
               onTouchStart={handleTouchStart}
               onTouchEnd={(e) => handleSwipeDownDrawReturn(e, false)}
             >
+               <span className="text-gray-400 font-bold text-sm mb-1 pointer-events-none">TO DECK BOTTOM</span>
                <button
                 onClick={() => handleReturnSelected(false)}
-                className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto flex flex-col items-center opacity-70 hover:opacity-100"
+                className="w-full px-2 py-1 text-xs transition-all pointer-events-auto flex flex-col items-center underline text-gray-400 hover:text-white active:scale-95"
               >
-                <span>TAP TO RETURN BOTTOM</span>
+                <span>(or tap to return to bottom)</span>
               </button>
             </div>
           </div>
