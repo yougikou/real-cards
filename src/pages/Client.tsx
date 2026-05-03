@@ -259,20 +259,22 @@ export default function Client() {
     const isRecentlyDrawn = recentlyDrawnCardIds.includes(card.id);
     const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
 
-    let cardClasses = 'bg-white hover:-translate-y-1';
+    let cardClasses = 'bg-white';
     if (isSelected) {
-      cardClasses = 'bg-yellow-100 ring-8 ring-yellow-400 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30';
+      cardClasses = 'bg-yellow-100 ring-4 ring-yellow-400 -translate-y-12 scale-110 shadow-2xl z-30';
     } else if (hasSelection) {
-      cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
+      cardClasses = 'bg-white opacity-40 saturate-50 scale-95 z-10';
     } else if (isRecentlyDrawn) {
-      cardClasses = 'bg-green-50 ring-4 ring-green-400 scale-105 shadow-[0_0_20px_rgba(74,222,128,0.5)] z-20 -translate-y-2';
+      cardClasses = 'bg-green-50 ring-4 ring-green-400 scale-105 shadow-[0_0_20px_rgba(74,222,128,0.5)] z-20 -translate-y-4';
+    } else {
+      cardClasses = 'bg-white z-10';
     }
 
     return (
       <div
         key={card.id}
         onClick={() => toggleSelect(card.id)}
-        className={`relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200 ${cardClasses}`}
+        className={`relative w-24 h-36 flex-shrink-0 transform transition-transform duration-300 snap-center rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer ${cardClasses}`}
       >
         {isSelected && (
           <div className="absolute -top-4 -right-4 bg-yellow-400 border-4 border-gray-900 rounded-full w-12 h-12 flex items-center justify-center text-2xl font-black text-gray-900 z-30 shadow-2xl">
@@ -518,9 +520,9 @@ export default function Client() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
+    <div className="h-[100dvh] bg-gray-900 text-white flex flex-col overflow-hidden fixed inset-0 pb-safe">
       {isPreview && (
-        <div className="bg-purple-900/40 border-2 border-purple-500 border-dashed rounded-lg p-3 mb-4 flex justify-between items-center shadow-lg">
+        <div className="bg-purple-900/40 border-2 border-purple-500 border-dashed rounded-lg p-3 mb-4 flex justify-between items-center shadow-lg flex-shrink-0 z-50 mx-4 mt-4">
           <div className="flex flex-col">
             <span className="text-purple-300 font-bold text-sm">Preview Harness</span>
             <span className="text-purple-400/80 text-xs">Test dark-card interactions</span>
@@ -534,250 +536,30 @@ export default function Client() {
         </div>
       )}
 
-      {/* Read-Only Table Info Banner */}
-      {activeGameState && (
-        <div className="flex justify-between items-center bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-          <div>Deck: <span className="text-white">{activeGameState.deckCount}</span></div>
-          <div className="flex items-center gap-1">
-            Discard: <span className="text-white">{activeGameState.discardPile.length}</span>
-            {activeGameState.discardPile.length > 0 && (
-              <span className={`px-1 py-0.5 rounded ml-1 bg-white leading-none flex items-center ${activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'hearts' || activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].rank}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'hearts' && '♥'}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'diamonds' && '♦'}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'clubs' && '♣'}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'spades' && '♠'}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'none' && '🃏'}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Top Play Zone Indicator */}
-      <div
-        className="min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center mb-4 bg-gray-800/50 cursor-pointer px-3 py-3"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleSwipeUpPlay}
-      >
-        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none mb-1">
-          Play Zone
-        </span>
-        <span className="text-gray-600 text-xs text-center pointer-events-none">
-          Select cards to Play (or play to discard)
-        </span>
-      </div>
-
-      {activeGameState && activeGameState.playStack.length > 0 && (
-        <div className="mb-4 flex flex-col gap-2">
-          {activeGameState.playStack.slice(-2).reverse().map((batch, idx) => {
-            const isTopBatch = idx === 0;
-            return (
-              <div key={idx} className={`bg-gray-800 rounded-xl p-3 border border-gray-700 flex flex-col ${isTopBatch ? '' : 'opacity-50 grayscale-[50%]'}`}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className={`text-xs font-bold uppercase tracking-wider ${isTopBatch ? 'text-yellow-500' : 'text-gray-500'}`}>
-                    {isTopBatch ? 'Latest Play (Top of Stack)' : 'Previous Play'}
-                  </span>
-                  {isTopBatch && (
-                    <button
-                      onClick={handleTakeBack}
-                      className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors active:scale-95 shadow-md"
-                    >
-                      TAKE BACK (Undo)
-                    </button>
-                  )}
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {batch.map((card: Card) => {
-                    const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
-                    return (
-                      <div key={card.id} className="w-12 h-16 bg-white rounded shadow flex flex-col justify-between p-1 flex-shrink-0">
-                        <div className={`text-xs font-bold leading-none ${color}`}>{card.rank}</div>
-                        <div className={`text-lg self-center leading-none ${color}`}>
-                          {card.suit === 'hearts' && '♥'}
-                          {card.suit === 'diamonds' && '♦'}
-                          {card.suit === 'clubs' && '♣'}
-                          {card.suit === 'spades' && '♠'}
-                          {card.suit === 'none' && '🃏'}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Hand Area */}
-      <div className="flex-grow flex flex-col">
-        <div className="mb-2">
-          <h2 className="text-lg font-bold flex justify-between items-center mb-2">
-            <span>Your Hand ({hand.length})</span>
-            {selectedCards.length > 0 ? (
-              <div className="flex items-center">
-                <button
-                   onClick={() => setSelectedCards([])}
-                   className="text-sm text-blue-400 bg-gray-800 px-3 py-1 rounded"
-                >
-                   Clear Selection
-                </button>
-                <span className="text-xs text-yellow-400 font-bold animate-pulse ml-2">↓ CHOOSE ACTION BELOW ↓</span>
-              </div>
-            ) : (
-              <span className="text-xs text-gray-500 font-normal">Tap cards to select &amp; act</span>
-            )}
-          </h2>
-          <div className="flex gap-2">
-            <span className="text-xs text-gray-400 self-center uppercase tracking-wider font-bold">Sort (Local Only):</span>
-            <button
-              onClick={() => setSortMode('draw')}
-              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'draw' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              TIME
-            </button>
-            <button
-              onClick={() => setSortMode('suit')}
-              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'suit' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              SUIT
-            </button>
-            <button
-              onClick={() => setSortMode('rank')}
-              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'rank' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              RANK
-            </button>
-            <button
-              onClick={() => setSortMode('free')}
-              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'free' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              FREE
-            </button>
-          </div>
-          {sortMode === 'free' && (
-            <div className="text-[10px] text-gray-400 mt-1.5 italic">
-              Use the ◀ L / R ▶ buttons on each card to arrange your hand.
-            </div>
-          )}
-        </div>
-
-        <div className="flex-grow overflow-y-auto pr-2 pb-4 pt-12 px-4">
-          {sortMode === 'draw' || sortMode === 'free' ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              {displayHand.map((card, idx) => renderCard(card, idx))}
-            </div>
-          ) : (
-            groupedHand && Object.entries(groupedHand).map(([groupName, cards]) => (
-              <div key={groupName} className="mb-6">
-                <div className="text-xs font-bold text-gray-500 mb-2 border-b border-gray-700 pb-1 uppercase tracking-wider">
-                  {groupName} ({cards.length})
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {cards.map((card, idx) => renderCard(card, idx))}
-                </div>
-              </div>
-            ))
-          )}
-          {hand.length === 0 && (
-            <div className="h-full flex items-center justify-center text-gray-500 mt-10">
-              No cards in hand. Swipe down to draw!
-            </div>
-          )}
-          {/* Spacer inside scroll container for action bar */}
-          {selectedCards.length > 0 && <div className="h-48 flex-shrink-0" />}
-
-        </div>
-      </div>
-
-      {/* Bottom Draw/Return Zone Indicator */}
-      <div
-        className="mt-4 min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-3 py-3"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={(e) => handleSwipeDownDrawReturn(e)}
-      >
-        <button
-          onClick={handleDrawAction}
-          disabled={isDrawing}
-          className={`rounded-lg px-6 py-3 text-lg font-bold text-white transition-all shadow-lg mb-1 pointer-events-auto flex items-center justify-center gap-2 ${
-            isDrawing ? 'bg-blue-800 scale-95 opacity-80 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
-          }`}
-        >
-          {isDrawing ? <span>DRAWING...</span> : <span>DRAW 1 FROM DECK</span>}
-        </button>
-        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none">
-          ↓ (OR SWIPE DOWN)
-        </span>
-      </div>
-
-      {selectedCards.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 border-t-2 border-yellow-400 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 flex flex-col gap-3 pb-safe">
-          <div className="text-yellow-400 text-xs font-bold uppercase tracking-wider text-center -mb-1 animate-pulse">
-            <span>↓ Actions for {selectedCards.length} selected card{selectedCards.length > 1 ? 's' : ''} ↓</span>
-          </div>
-          <div
-            className="w-full border-2 border-green-500 rounded-xl flex flex-col items-center justify-center bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-3"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleSwipeUpPlay}
-          >
-            <button
-              onClick={handlePlaySelected}
-              className="w-full rounded-xl bg-green-600 px-6 py-3 text-xl font-black text-white transition-all hover:bg-green-500 active:scale-[0.98] shadow-lg mb-1 pointer-events-auto flex items-center justify-center gap-2"
-            >
-              <span>⬆️</span>
-              <span>PLAY {selectedCards.length} TO TABLE</span>
-              <span>⬆️</span>
-            </button>
-            <span className="text-green-400 font-bold uppercase tracking-widest text-center text-[10px] pointer-events-none opacity-80">
-              TAP ABOVE OR SWIPE UP TO PLAY (OR DISCARD)
-            </span>
-          </div>
-
-          <div className="flex gap-2 w-full">
-            <div
-              className="flex-1 border border-blue-600 rounded-xl flex flex-col items-center justify-center bg-blue-900/30 cursor-pointer px-2 py-2"
-              onTouchStart={handleTouchStart}
-              onTouchEnd={(e) => handleSwipeDownDrawReturn(e, true)}
-            >
-              <button
-                onClick={() => handleReturnSelected(true)}
-                className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 active:scale-95 pointer-events-auto mb-1 flex flex-col items-center"
-              >
-                <span>⏫ RETURN {selectedCards.length} TO DECK TOP</span>
-                <span className="text-[9px] opacity-80 font-normal mt-0.5">(Next to be drawn)</span>
-              </button>
-              <span className="text-blue-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
-                ↓ SWIPE DOWN
-              </span>
-            </div>
-            <div
-              className="flex-1 border border-gray-500 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-2 py-2"
-              onTouchStart={handleTouchStart}
-              onTouchEnd={(e) => handleSwipeDownDrawReturn(e, false)}
-            >
-               <button
-                onClick={() => handleReturnSelected(false)}
-                className="w-full rounded-lg bg-gray-700 px-2 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-600 active:scale-95 pointer-events-auto mb-1 flex flex-col items-center"
-              >
-                <span>⏬ RETURN {selectedCards.length} TO DECK BOTTOM</span>
-                <span className="text-[9px] opacity-80 font-normal mt-0.5">(Bury under deck)</span>
-              </button>
-              <span className="text-gray-400 font-bold uppercase tracking-widest text-center text-[9px] pointer-events-none">
-                ↓ SWIPE DOWN
-              </span>
+      <div className="flex-shrink-0 px-4 pt-2 pb-2 z-20 bg-gray-900/80 backdrop-blur space-y-2">
+        {/* Read-Only Table Info Banner */}
+        {activeGameState && (
+          <div className="flex justify-between items-center bg-gray-800 border border-gray-700 rounded-lg p-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+            <div>Deck: <span className="text-white">{activeGameState.deckCount}</span></div>
+            <div className="flex items-center gap-1">
+              Discard: <span className="text-white">{activeGameState.discardPile.length}</span>
+              {activeGameState.discardPile.length > 0 && (
+                <span className={`px-1 py-0.5 rounded ml-1 bg-white leading-none flex items-center ${activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'hearts' || activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
+                  {activeGameState.discardPile[activeGameState.discardPile.length - 1].rank}
+                  {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'hearts' && '♥'}
+                  {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'diamonds' && '♦'}
+                  {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'clubs' && '♣'}
+                  {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'spades' && '♠'}
+                  {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'none' && '🃏'}
+                </span>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-
-
-      {/* Other Players Area */}
-      {activeGameState && Object.keys(activeGameState.players).length > 1 && (
-        <div className="mt-4 pt-4 border-t border-gray-800">
-          <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players (Peek & Draw)</h2>
-          <div className="flex overflow-x-auto gap-3 pb-2">
+        {/* Other Players Area */}
+        {activeGameState && Object.keys(activeGameState.players).length > 1 && (
+          <div className="flex overflow-x-auto gap-2 pb-1">
             {Object.values(activeGameState.players).map(p => {
               if (p.id === peerId) return null;
 
@@ -786,21 +568,138 @@ export default function Client() {
                   key={p.id}
                   type="button"
                   onClick={() => setViewOther(p.id)}
-                  className="flex-shrink-0 text-left bg-gray-800 border border-gray-700 rounded-lg p-3 w-32 cursor-pointer hover:bg-gray-700 hover:border-blue-500 active:scale-95 transition-all flex flex-col justify-between group"
+                  className="flex-shrink-0 text-left bg-gray-800 border border-gray-700 rounded-lg p-2 w-28 cursor-pointer hover:bg-gray-700 hover:border-blue-500 active:scale-95 transition-all flex flex-col justify-between group"
                 >
-                  <div>
-                    <div className="font-bold truncate text-sm text-white group-hover:text-blue-400 transition-colors">{p.name}</div>
-                    <div className="text-xs text-gray-400 mt-1">{p.handCount} cards</div>
+                  <div className="flex justify-between items-center">
+                    <div className="font-bold truncate text-xs text-white group-hover:text-blue-400 transition-colors flex-1 pr-1">{p.name}</div>
+                    <div className="text-[10px] text-gray-400 font-medium bg-gray-900 px-1.5 py-0.5 rounded">{p.handCount}</div>
                   </div>
-                  <div className="text-xs text-blue-500 mt-2 font-semibold uppercase tracking-widest opacity-80 group-hover:opacity-100 flex items-center gap-1">
-                    <span>👁 Peek & Draw</span>
+                  <div className="text-[9px] text-blue-500 mt-1 font-semibold uppercase tracking-widest opacity-80 group-hover:opacity-100 flex items-center gap-1">
+                    <span>👁 Peek</span>
                   </div>
                 </button>
               );
             })}
           </div>
+        )}
+      </div>
+
+      {/* Central Gesture Area */}
+      <div
+        className="flex-grow relative touch-none z-10 flex flex-col items-center justify-center w-full px-4"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={(e) => {
+          handleSwipeUpPlay(e);
+          handleSwipeDownDrawReturn(e, false); // pass false for default bottom return if needed
+        }}
+      >
+        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between py-8 opacity-20 font-black text-2xl tracking-widest text-gray-500">
+          <span>↑ PLAY AREA ↑</span>
+          <span>{selectedCards.length > 0 ? "↓ RETURN AREA ↓" : "↓ DRAW AREA ↓"}</span>
         </div>
-      )}
+
+        {activeGameState && activeGameState.playStack.length > 0 && (
+          <div className="w-full max-w-sm flex flex-col gap-2 relative z-10 pointer-events-auto">
+            {activeGameState.playStack.slice(-2).reverse().map((batch, idx) => {
+              const isTopBatch = idx === 0;
+              return (
+                <div key={idx} className={`bg-gray-800 rounded-xl p-3 border border-gray-700 flex flex-col shadow-lg ${isTopBatch ? 'ring-2 ring-yellow-500/50' : 'opacity-60 scale-95 origin-bottom'}`}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isTopBatch ? 'text-yellow-500' : 'text-gray-500'}`}>
+                      {isTopBatch ? 'Latest Play (Top)' : 'Previous Play'}
+                    </span>
+                    {isTopBatch && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleTakeBack(); }}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-[10px] uppercase transition-colors active:scale-95 shadow-md"
+                      >
+                        TAKE BACK
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-[-1rem] overflow-x-auto pb-1">
+                    {batch.map((card: Card, cardIdx) => {
+                      const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
+                      return (
+                        <div key={card.id} className="w-12 h-16 bg-white rounded shadow-md flex flex-col justify-between p-1 flex-shrink-0 border border-gray-300" style={{ marginLeft: cardIdx > 0 ? '-1rem' : '0', zIndex: cardIdx }}>
+                          <div className={`text-[10px] font-bold leading-none ${color}`}>{card.rank}</div>
+                          <div className={`text-xl self-center leading-none ${color}`}>
+                            {card.suit === 'hearts' && '♥'}
+                            {card.suit === 'diamonds' && '♦'}
+                            {card.suit === 'clubs' && '♣'}
+                            {card.suit === 'spades' && '♠'}
+                            {card.suit === 'none' && '🃏'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Hand Area */}
+      <div className="flex-shrink-0 flex flex-col h-72 w-full bg-gradient-to-t from-gray-900 via-gray-900 to-transparent relative z-30">
+        <div className="absolute top-0 left-0 right-0 px-4 flex justify-between items-end pointer-events-none">
+          <div className="flex gap-1 pointer-events-auto">
+            <button
+              onClick={() => setSortMode('draw')}
+              className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${sortMode === 'draw' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            >
+              TIME
+            </button>
+            <button
+              onClick={() => setSortMode('suit')}
+              className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${sortMode === 'suit' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            >
+              SUIT
+            </button>
+            <button
+              onClick={() => setSortMode('rank')}
+              className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${sortMode === 'rank' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            >
+              RANK
+            </button>
+            <button
+              onClick={() => setSortMode('free')}
+              className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${sortMode === 'free' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            >
+              FREE
+            </button>
+          </div>
+          {selectedCards.length > 0 && (
+             <button
+                onClick={() => setSelectedCards([])}
+                className="text-[10px] text-blue-400 bg-gray-800 px-2 py-1 rounded pointer-events-auto"
+             >
+                Clear Selection
+             </button>
+          )}
+        </div>
+
+        <div className="flex overflow-x-auto items-end h-full px-8 pb-8 pt-12 space-x-[-2.5rem] w-full snap-x snap-mandatory">
+          {sortMode === 'draw' || sortMode === 'free' ? (
+            displayHand.map((card, idx) => renderCard(card, idx))
+          ) : (
+            groupedHand && Object.entries(groupedHand).map(([groupName, cards]) => (
+              <div key={groupName} className="flex space-x-[-2.5rem] relative">
+                {cards.map((card, idx) => renderCard(card, idx))}
+              </div>
+            ))
+          )}
+          {hand.length === 0 && (
+            <div className="w-full flex items-center justify-center text-gray-500 font-bold mb-10">
+              No cards in hand. Swipe down to draw!
+            </div>
+          )}
+        </div>
+      </div>
+
+
+
     </div>
   );
 }
