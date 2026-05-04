@@ -1,0 +1,39 @@
+--- src/pages/PhaserTable.tsx
++++ src/pages/PhaserTable.tsx
+@@ -120,6 +120,7 @@
+       });
+
+       Object.assign(newCard, { cardData });
++      Object.assign(newCard, { dragSource: 'playStack' });
+
+       newCard.setAngle(Phaser.Math.Between(-5, 5));
+       newCard.setScale(1.1);
+@@ -311,6 +312,7 @@
+     });
+
+     Object.assign(newCard, { cardData: poppedCard });
++    Object.assign(newCard, { dragSource: 'deck' });
+
+     newCard.setAngle(Phaser.Math.Between(-5, 5));
+     newCard.setScale(1.1);
+@@ -391,10 +393,17 @@
+                 onComplete: () => {
+                     const cardData = (card as Phaser.Physics.Matter.Image & { cardData?: unknown }).cardData;
++                    const dragSource = (card as Phaser.Physics.Matter.Image & { dragSource?: string }).dragSource;
+                     card.destroy();
+                     if (cardData) {
+-                        window.dispatchEvent(new CustomEvent('host-return-popped-card', {
+-                            detail: { cardData }
+-                        }));
++                        if (dragSource === 'playStack') {
++                            window.dispatchEvent(new CustomEvent('host-return-public-card', {
++                                detail: { cardData }
++                            }));
++                        } else {
++                            window.dispatchEvent(new CustomEvent('host-return-popped-card', {
++                                detail: { cardData }
++                            }));
++                        }
+                     }
+                 }
+             });

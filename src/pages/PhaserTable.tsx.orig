@@ -121,7 +121,6 @@ class TableScene extends Phaser.Scene {
       });
 
       Object.assign(newCard, { cardData });
-      Object.assign(newCard, { dragSource: 'playStack' });
 
       newCard.setAngle(Phaser.Math.Between(-5, 5));
       newCard.setScale(1.1);
@@ -361,7 +360,6 @@ class TableScene extends Phaser.Scene {
     });
 
     Object.assign(newCard, { cardData: poppedCard });
-    Object.assign(newCard, { dragSource: 'deck' });
 
     newCard.setAngle(Phaser.Math.Between(-5, 5));
     newCard.setScale(1.1);
@@ -496,18 +494,11 @@ class TableScene extends Phaser.Scene {
                 ease: 'Power2',
                 onComplete: () => {
                     const cardData = (card as Phaser.Physics.Matter.Image & { cardData?: unknown }).cardData;
-                    const dragSource = (card as Phaser.Physics.Matter.Image & { dragSource?: string }).dragSource;
                     card.destroy();
                     if (cardData) {
-                        if (dragSource === 'playStack') {
-                            window.dispatchEvent(new CustomEvent('host-return-public-card', {
-                                detail: { cardData }
-                            }));
-                        } else {
-                            window.dispatchEvent(new CustomEvent('host-return-popped-card', {
-                                detail: { cardData }
-                            }));
-                        }
+                        window.dispatchEvent(new CustomEvent('host-return-popped-card', {
+                            detail: { cardData }
+                        }));
                     }
                 }
             });

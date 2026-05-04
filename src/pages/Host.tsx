@@ -136,8 +136,15 @@ export default function Host() {
                       return (
                         <div
                           key={card.id}
-                          className="w-24 h-36 bg-white rounded-lg shadow-md border border-gray-300 flex flex-col justify-between p-2 relative"
+                          className="w-24 h-36 bg-white rounded-lg shadow-md border border-gray-300 flex flex-col justify-between p-2 relative cursor-pointer hover:-translate-y-2 hover:shadow-xl transition-transform"
                           style={{ zIndex: cardIndex }}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent('host-drag-public-card', {
+                              detail: { cardData: card, x: e.clientX, y: e.clientY }
+                            }));
+                          }}
                         >
                           <div className={`text-sm font-bold ${color}`}>{card.rank}</div>
                           <div className={`text-2xl self-center ${color}`}>
