@@ -356,12 +356,45 @@ export function useHost() {
       });
     };
 
+    const handleHostDragPublicCard = (e: Event) => {
+      const customEvent = e as CustomEvent<{ cardData: Card, x: number, y: number }>;
+      const { cardData } = customEvent.detail;
+
+      updateStateAndBroadcast(prev => {
+        // Remove the card from playStack
+        const newPlayStack = prev.playStack.map(batch =>
+          batch.filter(c => c.id !== cardData.id)
+        ).filter(batch => batch.length > 0);
+
+        return {
+          ...prev,
+          playStack: newPlayStack
+        };
+      });
+    };
+
+    const handleHostReturnPublicCard = (e: Event) => {
+      const customEvent = e as CustomEvent<{ cardData: Card }>;
+      const { cardData } = customEvent.detail;
+
+      updateStateAndBroadcast(prev => {
+        // Just push it to the end of the play stack as a new batch, or to the top batch.
+        // For simplicity, we can just append it as a new batch.
+        return {
+          ...prev,
+          playStack: [...prev.playStack, [cardData]]
+        };
+      });
+    };
+
     window.addEventListener('host-deal-card', handleHostDeal);
     window.addEventListener('host-pop-card', handleHostPopCard);
     window.addEventListener('host-return-popped-card', handleHostReturnPoppedCard);
     window.addEventListener('host-draw-to-table', handleHostDrawToTable);
     window.addEventListener('host-return-batch', handleHostReturnBatch);
     window.addEventListener('host-clear-table', handleHostClearTable);
+    window.addEventListener('host-drag-public-card', handleHostDragPublicCard);
+    window.addEventListener('host-return-public-card', handleHostReturnPublicCard);
     return () => {
       window.removeEventListener('host-deal-card', handleHostDeal);
       window.removeEventListener('host-pop-card', handleHostPopCard);
@@ -369,6 +402,8 @@ export function useHost() {
       window.removeEventListener('host-draw-to-table', handleHostDrawToTable);
       window.removeEventListener('host-return-batch', handleHostReturnBatch);
       window.removeEventListener('host-clear-table', handleHostClearTable);
+      window.removeEventListener('host-drag-public-card', handleHostDragPublicCard);
+      window.removeEventListener('host-return-public-card', handleHostReturnPublicCard);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
