@@ -18,6 +18,7 @@ class TableScene extends Phaser.Scene {
 
   private dragConstraint: MatterJS.ConstraintType | null = null;
   private dragCard: Phaser.Physics.Matter.Image | null = null;
+  private dragShadow: Phaser.GameObjects.Image | null = null;
   private pointerBody: MatterJS.BodyType | null = null;
   private deckText: Phaser.GameObjects.Text | null = null;
 
@@ -315,7 +316,15 @@ class TableScene extends Phaser.Scene {
     Object.assign(newCard, { cardData: poppedCard });
 
     newCard.setAngle(Phaser.Math.Between(-5, 5));
+    newCard.setScale(1.1);
+    newCard.setDepth(100);
     this.dragCard = newCard;
+
+    this.dragShadow = this.add.image(startX + 10, startY + 10, 'cardFront');
+    this.dragShadow.setTint(0x000000);
+    this.dragShadow.setAlpha(0.3);
+    this.dragShadow.setScale(1.1);
+    this.dragShadow.setDepth(99);
 
     if (this.pointerBody) {
          this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
@@ -341,6 +350,10 @@ class TableScene extends Phaser.Scene {
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
         if (this.dragCard && this.pointerBody && this.dragConstraint && this.matter) {
              this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
+             if (this.dragShadow) {
+                 this.dragShadow.setPosition(this.dragCard.x + 15, this.dragCard.y + 15);
+                 this.dragShadow.setRotation(this.dragCard.rotation);
+             }
              this.updateZoneLabels();
         } else if (pointer.isDown) {
              this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
@@ -352,6 +365,11 @@ class TableScene extends Phaser.Scene {
          if (this.dragCard) {
              this.releaseCard(this.dragCard);
              this.dragCard = null;
+
+             if (this.dragShadow) {
+                 this.dragShadow.destroy();
+                 this.dragShadow = null;
+             }
 
              if (this.dragConstraint && this.matter && this.matter.world) {
                  this.matter.world.removeConstraint(this.dragConstraint);
@@ -377,51 +395,67 @@ class TableScene extends Phaser.Scene {
          }
     }
 
-    if (targetZone && targetZone.mappedPlayerId) {
-        card.setStatic(true);
+    // Settle animation common to both drop outcomes
+    this.tweens.add({
+        targets: card,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 150,
+        ease: 'Power2'
+    });
 
-        this.tweens.add({
-            targets: card,
-            x: targetZone.rect.x,
-            y: targetZone.rect.y,
-            scaleX: 0.2,
-            scaleY: 0.2,
-            alpha: 0,
-            duration: 400,
-            ease: 'Power2',
-            onComplete: () => {
-                const cardData = (card as Phaser.Physics.Matter.Image & { cardData?: unknown }).cardData;
-                card.destroy();
-                if (targetZone?.mappedPlayerId) {
-                  window.dispatchEvent(new CustomEvent('host-deal-card', {
-                    detail: { playerId: targetZone.mappedPlayerId, cardData }
-                  }));
+    if (targetZone && targetZone.mappedPlayerId) {
+        // Let it fly physically for a moment before dealing
+        this.time.delayedCall(250, () => {
+            if (!card.active) return;
+            card.setStatic(true);
+
+            this.tweens.add({
+                targets: card,
+                x: targetZone!.rect.x,
+                y: targetZone!.rect.y,
+                scaleX: 0.2,
+                scaleY: 0.2,
+                alpha: 0,
+                duration: 400,
+                ease: 'Power2',
+                onComplete: () => {
+                    const cardData = (card as Phaser.Physics.Matter.Image & { cardData?: unknown }).cardData;
+                    card.destroy();
+                    if (targetZone?.mappedPlayerId) {
+                      window.dispatchEvent(new CustomEvent('host-deal-card', {
+                        detail: { playerId: targetZone.mappedPlayerId, cardData }
+                      }));
+                    }
                 }
-            }
+            });
         });
     } else {
-        // Return to deck if dropped on invalid area
-        card.setStatic(true);
-        const { width, height } = this.scale;
+        // Let it slide on the table physically before returning to deck
+        this.time.delayedCall(500, () => {
+            if (!card.active) return;
+            card.setStatic(true);
+            const { width, height } = this.scale;
 
-        this.tweens.add({
-            targets: card,
-            x: width / 2,
-            y: height / 2,
-            scaleX: 0.5,
-            scaleY: 0.5,
-            alpha: 0,
-            duration: 400,
-            ease: 'Power2',
-            onComplete: () => {
-                const cardData = (card as Phaser.Physics.Matter.Image & { cardData?: unknown }).cardData;
-                card.destroy();
-                if (cardData) {
-                    window.dispatchEvent(new CustomEvent('host-return-popped-card', {
-                        detail: { cardData }
-                    }));
+            this.tweens.add({
+                targets: card,
+                x: width / 2,
+                y: height / 2,
+                scaleX: 0.5,
+                scaleY: 0.5,
+                alpha: 0,
+                duration: 400,
+                ease: 'Power2',
+                onComplete: () => {
+                    const cardData = (card as Phaser.Physics.Matter.Image & { cardData?: unknown }).cardData;
+                    card.destroy();
+                    if (cardData) {
+                        window.dispatchEvent(new CustomEvent('host-return-popped-card', {
+                            detail: { cardData }
+                        }));
+                    }
                 }
-            }
+            });
         });
     }
   }
