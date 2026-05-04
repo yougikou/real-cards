@@ -105,6 +105,13 @@ export default function Client() {
   const [sortMode, setSortMode] = useState<SortMode>('draw');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
 
+  // Drag and drop state for FREE mode
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const dragStartPosRef = React.useRef<{ x: number; y: number } | null>(null);
+  const lastDragTimeRef = React.useRef<number>(0);
+
+
   // Track newly drawn cards to apply visual highlights
   const previousHandRef = React.useRef<Card[]>(hand);
   React.useEffect(() => {
@@ -185,17 +192,69 @@ export default function Client() {
     );
   };
 
-  const moveCard = (e: React.MouseEvent, index: number, direction: 'left' | 'right') => {
-    e.stopPropagation();
-    setCustomOrder(prev => {
-      const newOrder = [...prev];
-      if (direction === 'left' && index > 0) {
-        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-      } else if (direction === 'right' && index < newOrder.length - 1) {
-        [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
+
+
+
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>, index: number) => {
+    if (sortMode !== 'free') return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDraggedIndex(index);
+    setDragOverIndex(index);
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (draggedIndex === null || sortMode !== 'free') return;
+    // Only drag after moving 5px
+    if (dragStartPosRef.current) {
+        const dx = e.clientX - dragStartPosRef.current.x;
+        const dy = e.clientY - dragStartPosRef.current.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 5) return;
+    }
+
+    // Disable scrolling while dragging cards
+    e.preventDefault();
+
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const cardEl = el?.closest('[data-card-index]');
+    if (cardEl) {
+      const overIndex = parseInt(cardEl.getAttribute('data-card-index') || '-1', 10);
+      if (overIndex !== -1 && overIndex !== dragOverIndex) {
+        setDragOverIndex(overIndex);
       }
-      return newOrder;
-    });
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (draggedIndex === null || sortMode !== 'free') return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+
+    let didDrag = false;
+    if (dragStartPosRef.current) {
+        const dx = e.clientX - dragStartPosRef.current.x;
+        const dy = e.clientY - dragStartPosRef.current.y;
+        if (Math.sqrt(dx * dx + dy * dy) >= 5) {
+            didDrag = true;
+        }
+    }
+
+    if (didDrag && dragOverIndex !== null && dragOverIndex !== draggedIndex) {
+      setCustomOrder(prev => {
+        const newOrder = [...prev];
+        const item = newOrder.splice(draggedIndex, 1)[0];
+        newOrder.splice(dragOverIndex, 0, item);
+        return newOrder;
+      });
+    }
+
+    if (didDrag) {
+       lastDragTimeRef.current = Date.now();
+    }
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    dragStartPosRef.current = null;
   };
 
   const handlePlaySelected = () => {
@@ -263,7 +322,11 @@ export default function Client() {
     const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
 
     let cardClasses = 'bg-white hover:-translate-y-1';
-    if (isSelected) {
+    if (sortMode === 'free' && index === draggedIndex && index !== -1) {
+      cardClasses = 'bg-yellow-50 ring-4 ring-yellow-400 scale-110 shadow-2xl z-50 opacity-90 rotate-3';
+    } else if (sortMode === 'free' && index === dragOverIndex && draggedIndex !== null && index !== draggedIndex && index !== -1) {
+      cardClasses = 'bg-white opacity-80 border-4 border-dashed border-blue-400 translate-x-2';
+    } else if (isSelected) {
       cardClasses = 'bg-yellow-100 ring-8 ring-yellow-400 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30';
     } else if (hasSelection) {
       cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
@@ -274,8 +337,13 @@ export default function Client() {
     return (
       <div
         key={card.id}
-        onClick={() => toggleSelect(card.id)}
-        className={`relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200 ${cardClasses}`}
+        data-card-index={index !== -1 ? index : undefined}
+        onPointerDown={(e) => index !== -1 && handlePointerDown(e, index)}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onClick={(e) => { if (Date.now() - lastDragTimeRef.current < 50) { e.preventDefault(); return; } toggleSelect(card.id); }}
+        className={`relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200 ${cardClasses} ${sortMode === 'free' ? 'touch-none' : ''}`}
       >
         {isSelected && (
           <div className="absolute -top-4 -right-4 bg-yellow-400 border-4 border-gray-900 rounded-full w-12 h-12 flex items-center justify-center text-2xl font-black text-gray-900 z-30 shadow-2xl">
@@ -296,28 +364,7 @@ export default function Client() {
           {card.suit === 'none' && '🃏'}
         </div>
         <div className="flex justify-between items-end">
-          {sortMode === 'free' && index !== -1 ? (
-            <div className="flex gap-1">
-              <button
-                onClick={(e) => moveCard(e, index, 'left')}
-                disabled={index === 0}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-800 rounded px-1.5 py-1 text-[10px] font-bold disabled:opacity-30 flex items-center shadow-sm"
-                title="Move Left"
-              >
-                ◀ L
-              </button>
-              <button
-                onClick={(e) => moveCard(e, index, 'right')}
-                disabled={index === customOrder.length - 1}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-800 rounded px-1.5 py-1 text-[10px] font-bold disabled:opacity-30 flex items-center shadow-sm"
-                title="Move Right"
-              >
-                R ▶
-              </button>
-            </div>
-          ) : (
-            <div />
-          )}
+          <div />
           <div className={`text-lg font-bold rotate-180 ${color} ml-1`}>{card.rank}</div>
         </div>
       </div>
@@ -681,7 +728,7 @@ export default function Client() {
           </div>
           {sortMode === 'free' && (
             <div className="text-[10px] text-gray-400 mt-1.5 italic">
-              Use the ◀ L / R ▶ buttons on each card to arrange your hand.
+              Long press and drag cards to rearrange your hand.
             </div>
           )}
         </div>
