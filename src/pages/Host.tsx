@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useHost } from '../hooks/useHost';
 import PhaserTable from './PhaserTable';
 import { playShuffleSound } from '../utils/audio/shuffle';
+import { DEFAULT_SANDBOX_PACK } from '../config/tableConfig';
 
 export default function Host() {
   const { status, error, retry, peerId, gameState, resetGame } = useHost();
@@ -164,13 +165,13 @@ export default function Host() {
             })}
             {gameState.playStack.length === 0 && (
               <div className="text-emerald-300/50 font-bold text-2xl uppercase tracking-widest border-2 border-dashed border-emerald-400/30 bg-black/20 px-8 py-12 rounded-2xl flex flex-col items-center">
-                <span>Public Table</span>
-                <span className="text-sm font-normal mt-2 text-emerald-300/20 text-center normal-case tracking-normal">Played cards will<br/>appear here</span>
+                <span>{DEFAULT_SANDBOX_PACK.containers.playStack.emptyText}</span>
+                <span className="text-sm font-normal mt-2 text-emerald-300/20 text-center normal-case tracking-normal" dangerouslySetInnerHTML={{ __html: DEFAULT_SANDBOX_PACK.containers.playStack.emptySubText || '' }}></span>
               </div>
             )}
             <div className="absolute -bottom-16 text-center z-10 pointer-events-none flex flex-col items-center">
               <div className="text-white/50 font-bold text-sm uppercase tracking-widest">
-                Public Play History
+                {DEFAULT_SANDBOX_PACK.containers.playStack.label}
               </div>
               <div className="text-white/40 text-xs font-medium mt-1 mb-2">
                 {gameState.playStack.reduce((acc, batch) => acc + batch.length, 0)} cards in stack
@@ -199,7 +200,7 @@ export default function Host() {
           <div
             className={`w-32 h-48 rounded-xl shadow-lg border-2 flex flex-col items-center justify-center transition-opacity ${gameState.discardPile.length > 0 ? 'opacity-100 border-solid border-gray-400 bg-gray-800' : 'opacity-50 border-dashed border-gray-500 bg-gray-900/80'}`}
           >
-            <div className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-widest">Discard</div>
+            <div className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-widest">{DEFAULT_SANDBOX_PACK.containers.discardPile.label}</div>
             <div className="text-2xl font-black text-gray-500">{gameState.discardPile.length}</div>
 
             {gameState.discardPile.length > 0 && (
@@ -216,14 +217,14 @@ export default function Host() {
                 </span>
               </div>
             )}
-            {gameState.discardPile.length === 0 && <div className="text-gray-500 text-xs mt-2 font-medium">Drop here to clear</div>}
+            {gameState.discardPile.length === 0 && <div className="text-gray-500 text-xs mt-2 font-medium">{DEFAULT_SANDBOX_PACK.containers.discardPile.emptyText}</div>}
           </div>
 
           {/* Deck */}
           <div
             className={`w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center transition-colors ring-2 ring-blue-400/50 ${gameState.deckCount > 0 ? '' : 'opacity-50'}`}
           >
-            <div className="text-white/80 font-bold mb-2">Deck Count</div>
+            <div className="text-white/80 font-bold mb-2">{DEFAULT_SANDBOX_PACK.containers.deck.label}</div>
             <div className="text-3xl font-black">{gameState.deckCount}</div>
           </div>
 
