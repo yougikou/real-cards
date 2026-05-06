@@ -6,8 +6,6 @@ export interface ContainerConfig {
   shortLabel?: string;
   emptyText?: string;
   emptySubText?: string;
-  clearAction?: string;
-  clearActionEmpty?: string;
 }
 
 export interface GamePackConfig {
@@ -38,8 +36,6 @@ export const DEFAULT_SANDBOX_PACK: GamePackConfig = {
       label: 'Public Play History',
       emptyText: 'Public Table',
       emptySubText: 'Played cards will<br/>appear here',
-      clearAction: 'Clear Area to Discard ↓',
-      clearActionEmpty: 'Clear to Discard (Area Empty)',
     },
     discardPile: {
       id: 'discardPile',

@@ -181,14 +181,14 @@ export default function Host() {
                   onClick={() => window.dispatchEvent(new Event('host-clear-table'))}
                   className="pointer-events-auto bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-black px-6 py-2 rounded-full border-2 border-amber-200 text-sm uppercase tracking-wider font-bold transition-all shadow-[0_0_20px_rgba(245,158,11,0.6)] active:scale-95"
                 >
-                  {DEFAULT_SANDBOX_PACK.containers.playStack.clearAction}
+                  Clear Area to Discard ↓
                 </button>
               ) : (
                 <button
                   disabled
                   className="pointer-events-auto bg-gray-800/50 text-gray-500 px-4 py-1.5 rounded-full border border-gray-600/50 text-xs uppercase tracking-wider font-bold cursor-not-allowed shadow-none"
                 >
-                  {DEFAULT_SANDBOX_PACK.containers.playStack.clearActionEmpty}
+                  Clear to Discard (Area Empty)
                 </button>
               )}
             </div>
