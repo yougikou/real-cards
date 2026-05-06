@@ -1,4 +1,4 @@
-export type ContainerType = 'deck' | 'playStack' | 'discardPile';
+export type ContainerType = 'deck' | 'playStack' | 'discardPile' | 'equipmentZone';
 
 export interface ContainerConfig {
   id: ContainerType;
@@ -20,8 +20,14 @@ export interface GamePackConfig {
 export const DEFAULT_SANDBOX_PACK: GamePackConfig = {
   id: 'standard-sandbox',
   name: 'Standard Sandbox',
-  layoutOrder: ['discardPile', 'deck'],
+  layoutOrder: ['equipmentZone', 'discardPile', 'deck'],
   containers: {
+    equipmentZone: {
+      id: 'equipmentZone',
+      label: 'Equipment',
+      shortLabel: 'Equip',
+      emptyText: 'Drop to equip',
+    },
     deck: {
       id: 'deck',
       label: 'Deck Count',

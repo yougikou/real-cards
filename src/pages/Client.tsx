@@ -608,7 +608,10 @@ export default function Client() {
       {/* Read-Only Table Info Banner */}
       {activeGameState && (
         <div className="flex justify-between items-center bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-          <div>{DEFAULT_SANDBOX_PACK.containers.deck.shortLabel}: <span className="text-white">{activeGameState.deckCount}</span></div>
+          <div className="flex gap-4">
+            <div>{DEFAULT_SANDBOX_PACK.containers.deck.shortLabel}: <span className="text-white">{activeGameState.deckCount}</span></div>
+            <div>{DEFAULT_SANDBOX_PACK.containers.equipmentZone.shortLabel}: <span className="text-white">0</span></div>
+          </div>
           <div className="flex items-center gap-1">
             {DEFAULT_SANDBOX_PACK.containers.discardPile.shortLabel}: <span className="text-white">{activeGameState.discardPile.length}</span>
             {activeGameState.discardPile.length > 0 && (

@@ -197,6 +197,14 @@ export default function Host() {
 
         <div className="absolute top-4 right-4 flex gap-4 pointer-events-auto">
           {DEFAULT_SANDBOX_PACK.layoutOrder.map((containerId) => {
+            if (containerId === 'equipmentZone') {
+              return (
+                <div key={containerId} className={`w-32 h-48 rounded-xl shadow-lg border-2 flex flex-col items-center justify-center transition-opacity opacity-50 border-dashed border-gray-500 bg-gray-900/80`}>
+                  <div className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-widest">{DEFAULT_SANDBOX_PACK.containers.equipmentZone.label}</div>
+                  <div className="text-gray-500 text-xs mt-2 font-medium">{DEFAULT_SANDBOX_PACK.containers.equipmentZone.emptyText}</div>
+                </div>
+              );
+            }
             if (containerId === 'discardPile') {
               return (
                 <div key={containerId} className={`w-32 h-48 rounded-xl shadow-lg border-2 flex flex-col items-center justify-center transition-opacity ${gameState.discardPile.length > 0 ? 'opacity-100 border-solid border-gray-400 bg-gray-800' : 'opacity-50 border-dashed border-gray-500 bg-gray-900/80'}`}>
