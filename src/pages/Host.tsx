@@ -181,14 +181,14 @@ export default function Host() {
                   onClick={() => window.dispatchEvent(new Event('host-clear-table'))}
                   className="pointer-events-auto bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-black px-6 py-2 rounded-full border-2 border-amber-200 text-sm uppercase tracking-wider font-bold transition-all shadow-[0_0_20px_rgba(245,158,11,0.6)] active:scale-95"
                 >
-                  Clear Area to Discard ↓
+                  {DEFAULT_SANDBOX_PACK.containers.playStack.actionButtonText}
                 </button>
               ) : (
                 <button
                   disabled
                   className="pointer-events-auto bg-gray-800/50 text-gray-500 px-4 py-1.5 rounded-full border border-gray-600/50 text-xs uppercase tracking-wider font-bold cursor-not-allowed shadow-none"
                 >
-                  Clear to Discard (Area Empty)
+                  {DEFAULT_SANDBOX_PACK.containers.playStack.disabledButtonText}
                 </button>
               )}
             </div>
@@ -196,37 +196,47 @@ export default function Host() {
         </div>
 
         <div className="absolute top-4 right-4 flex gap-4 pointer-events-auto">
-          {/* Discard Pile */}
-          <div
-            className={`w-32 h-48 rounded-xl shadow-lg border-2 flex flex-col items-center justify-center transition-opacity ${gameState.discardPile.length > 0 ? 'opacity-100 border-solid border-gray-400 bg-gray-800' : 'opacity-50 border-dashed border-gray-500 bg-gray-900/80'}`}
-          >
-            <div className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-widest">{DEFAULT_SANDBOX_PACK.containers.discardPile.label}</div>
-            <div className="text-2xl font-black text-gray-500">{gameState.discardPile.length}</div>
+          {DEFAULT_SANDBOX_PACK.layoutOrder.map((containerId) => {
+            if (containerId === 'discardPile') {
+              return (
+                <div
+                  key="discardPile"
+                  className={`w-32 h-48 rounded-xl shadow-lg border-2 flex flex-col items-center justify-center transition-opacity ${gameState.discardPile.length > 0 ? 'opacity-100 border-solid border-gray-400 bg-gray-800' : 'opacity-50 border-dashed border-gray-500 bg-gray-900/80'}`}
+                >
+                  <div className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-widest">{DEFAULT_SANDBOX_PACK.containers.discardPile.label}</div>
+                  <div className="text-2xl font-black text-gray-500">{gameState.discardPile.length}</div>
 
-            {gameState.discardPile.length > 0 && (
-              <div className="mt-3 bg-white w-16 h-20 rounded shadow flex flex-col items-center justify-center p-1 transform rotate-6">
-                <span className={`text-sm font-bold ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
-                  {gameState.discardPile[gameState.discardPile.length - 1].rank}
-                </span>
-                <span className={`text-xl ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
-                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' && '♥'}
-                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' && '♦'}
-                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'clubs' && '♣'}
-                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'spades' && '♠'}
-                  {gameState.discardPile[gameState.discardPile.length - 1].suit === 'none' && '🃏'}
-                </span>
-              </div>
-            )}
-            {gameState.discardPile.length === 0 && <div className="text-gray-500 text-xs mt-2 font-medium">{DEFAULT_SANDBOX_PACK.containers.discardPile.emptyText}</div>}
-          </div>
-
-          {/* Deck */}
-          <div
-            className={`w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center transition-colors ring-2 ring-blue-400/50 ${gameState.deckCount > 0 ? '' : 'opacity-50'}`}
-          >
-            <div className="text-white/80 font-bold mb-2">{DEFAULT_SANDBOX_PACK.containers.deck.label}</div>
-            <div className="text-3xl font-black">{gameState.deckCount}</div>
-          </div>
+                  {gameState.discardPile.length > 0 && (
+                    <div className="mt-3 bg-white w-16 h-20 rounded shadow flex flex-col items-center justify-center p-1 transform rotate-6">
+                      <span className={`text-sm font-bold ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
+                        {gameState.discardPile[gameState.discardPile.length - 1].rank}
+                      </span>
+                      <span className={`text-xl ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
+                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' && '♥'}
+                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' && '♦'}
+                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'clubs' && '♣'}
+                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'spades' && '♠'}
+                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'none' && '🃏'}
+                      </span>
+                    </div>
+                  )}
+                  {gameState.discardPile.length === 0 && <div className="text-gray-500 text-xs mt-2 font-medium">{DEFAULT_SANDBOX_PACK.containers.discardPile.emptyText}</div>}
+                </div>
+              );
+            }
+            if (containerId === 'deck') {
+              return (
+                <div
+                  key="deck"
+                  className={`w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center transition-colors ring-2 ring-blue-400/50 ${gameState.deckCount > 0 ? '' : 'opacity-50'}`}
+                >
+                  <div className="text-white/80 font-bold mb-2">{DEFAULT_SANDBOX_PACK.containers.deck.label}</div>
+                  <div className="text-3xl font-black">{gameState.deckCount}</div>
+                </div>
+              );
+            }
+            return null;
+          })}
 
           {/* Reset & Shuffle (Discard) */}
           <div
