@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 
 import type { Player } from '../types';
+import { DEFAULT_SANDBOX_PACK } from '../config/tableConfig';
 
 interface PlayerZone {
   rect: Phaser.GameObjects.Rectangle;
@@ -304,7 +305,7 @@ class TableScene extends Phaser.Scene {
       } else {
         zone.mappedPlayerId = undefined;
         if (zone.text) {
-          zone.text.setText(`[ ${zone.defaultText} ]\nDROP TO DEAL`);
+          zone.text.setText(`[ ${zone.defaultText} ]\n${DEFAULT_SANDBOX_PACK.emptySeatDropText || 'DROP TO DEAL'}`);
           zone.text.setColor('#888888');
           zone.text.setFontStyle('normal');
           zone.text.setAlpha(this.dragCard ? 0.1 : 0.5);
@@ -336,7 +337,7 @@ class TableScene extends Phaser.Scene {
       this.deckSprites.push(card);
     }
 
-    this.deckText = this.add.text(deckX, deckY + 60, 'CENTER DECK\nDRAG TO DEAL', { color: '#fbbf24', fontSize: '14px', align: 'center', backgroundColor: '#000000', padding: { x: 8, y: 4 } }).setOrigin(0.5).setAlpha(0.9);
+    this.deckText = this.add.text(deckX, deckY + 60, DEFAULT_SANDBOX_PACK.containers.deck.dragToDealText || 'CENTER DECK\nDRAG TO DEAL', { color: '#fbbf24', fontSize: '14px', align: 'center', backgroundColor: '#000000', padding: { x: 8, y: 4 } }).setOrigin(0.5).setAlpha(0.9);
   }
 
   private spawnAndDragCard(pointer: Phaser.Input.Pointer, startX: number, startY: number) {
