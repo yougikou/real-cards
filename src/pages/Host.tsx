@@ -1,181 +1,239 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useHost } from '../hooks/useHost';
 import PhaserTable from './PhaserTable';
 import { playShuffleSound } from '../utils/audio/shuffle';
 import { DEFAULT_SANDBOX_PACK } from '../config/tableConfig';
 
+const SUIT_SYMBOLS: Record<string, string> = {
+  hearts: '♥',
+  diamonds: '♦',
+  clubs: '♣',
+  spades: '♠',
+  none: '🃏',
+};
+
+const STATUS_STYLES: Record<string, { panel: string; dot: string; label: string }> = {
+  ready: {
+    panel: 'border-emerald-400/30 bg-emerald-950/60 text-emerald-50',
+    dot: 'bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.55)]',
+    label: 'Host Ready',
+  },
+  starting: {
+    panel: 'border-sky-400/30 bg-sky-950/60 text-sky-50',
+    dot: 'bg-sky-400 animate-pulse shadow-[0_0_14px_rgba(56,189,248,0.55)]',
+    label: 'Starting Host',
+  },
+  reconnecting: {
+    panel: 'border-amber-400/30 bg-amber-950/60 text-amber-50',
+    dot: 'bg-amber-400 animate-pulse shadow-[0_0_14px_rgba(251,191,36,0.55)]',
+    label: 'Reconnecting',
+  },
+  failed: {
+    panel: 'border-rose-400/30 bg-rose-950/60 text-rose-50',
+    dot: 'bg-rose-400 shadow-[0_0_14px_rgba(248,113,113,0.55)]',
+    label: 'Connection Failed',
+  },
+};
+
+function getStatusStyles(status: keyof typeof STATUS_STYLES) {
+  return STATUS_STYLES[status] ?? STATUS_STYLES.starting;
+}
+
+function SuitGlyph({ suit }: { suit: string }) {
+  return <>{SUIT_SYMBOLS[suit] ?? '🃏'}</>;
+}
+
 export default function Host() {
   const { status, error, retry, peerId, gameState, resetGame } = useHost();
 
-  const joinUrl = `${window.location.origin}${window.location.pathname}#/client/${peerId}`;
+  const joinUrl = useMemo(
+    () => `${window.location.origin}${window.location.pathname}#/client/${peerId}`,
+    [peerId],
+  );
+
+  const statusStyles = getStatusStyles(status);
+  const playerCount = Object.keys(gameState.players).length;
+  const stackCardCount = gameState.playStack.reduce((acc, batch) => acc + batch.length, 0);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('players-updated', { detail: { players: gameState.players } }));
   }, [gameState.players]);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden">
-      <div className="fixed inset-0 z-0">
+    <div className="relative h-screen w-full overflow-hidden bg-[#07111f] text-white">
+      <div className="absolute inset-0 z-0">
         <PhaserTable />
       </div>
 
-      {/* Connection Status Indicator */}
-      <div className="absolute top-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
-        <div className={`pointer-events-auto flex items-center space-x-3 px-4 py-2 rounded-full shadow-lg border text-sm font-medium ${
-          status === 'ready' ? 'bg-green-900/80 border-green-500 text-green-100' :
-          status === 'starting' ? 'bg-blue-900/80 border-blue-500 text-blue-100' :
-          status === 'reconnecting' ? 'bg-yellow-900/80 border-yellow-500 text-yellow-100' :
-          'bg-red-900/80 border-red-500 text-red-100'
-        }`}>
-          <span className="flex items-center space-x-2">
-            <span className={`w-2 h-2 rounded-full ${
-              status === 'ready' ? 'bg-green-400' :
-              status === 'starting' ? 'bg-blue-400 animate-pulse' :
-              status === 'reconnecting' ? 'bg-yellow-400 animate-pulse' :
-              'bg-red-400'
-            }`} />
-            <span>
-              {status === 'ready' && 'Host Connected'}
-              {status === 'starting' && 'Starting Host...'}
-              {status === 'reconnecting' && 'Reconnecting...'}
-              {status === 'failed' && `Connection Failed: ${error || 'Unknown error'}`}
-            </span>
-          </span>
-          {status !== 'ready' && (
-            <button
-              onClick={retry}
-              className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-xs transition-colors"
-            >
-              Retry
-            </button>
-          )}
-        </div>
-      </div>
+      <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.12),transparent_35%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.08),transparent_30%),linear-gradient(to_bottom,rgba(2,6,23,0.1),rgba(2,6,23,0.3))]" />
 
-      <div className="absolute inset-0 z-10 pointer-events-none flex flex-col p-4 text-white">
-        {status === 'ready' && peerId ? (
-          <div className="absolute top-4 left-4 bg-white/10 p-4 rounded-lg flex flex-col gap-3 mt-8">
-            <div className="flex gap-4 items-center">
-              <div className="bg-white p-2 rounded">
-                <QRCodeSVG value={joinUrl} size={100} />
+      <div className="pointer-events-none absolute inset-0 z-20 flex flex-col">
+        <header className="flex flex-col gap-3 p-4 md:flex-row md:items-start md:justify-between">
+          <div className="pointer-events-auto w-full max-w-[32rem] overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-950/55 shadow-[0_24px_80px_rgba(2,6,23,0.45)] backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full border ${statusStyles.panel}`}>
+                  <span className={`h-2.5 w-2.5 rounded-full ${statusStyles.dot}`} />
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.35em] text-white/45">Host Table</div>
+                  <div className="text-lg font-semibold text-white">{statusStyles.label}</div>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold">Scan to Join</h2>
-                <p className="text-sm opacity-80 mt-1">Room ID: {peerId}</p>
+
+              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.3em] text-white/60">
+                {status === 'ready' ? 'Live session' : 'Standby'}
               </div>
             </div>
-            {/* Host Status Panel */}
-            <div className="flex items-center gap-3 text-xs bg-black/40 rounded-md px-3 py-2 border border-white/10">
-              <span className="flex items-center gap-1.5 text-green-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                Live
-              </span>
-              <span className="text-white/60">|</span>
-              <span className="text-white/70">
-                <span className="text-white/50">Peers: </span>
-                <span className="font-mono text-white/90 font-bold">{Object.keys(gameState.players).length}</span>
-              </span>
-              <span className="text-white/60">|</span>
-              <span className={error ? 'text-red-300 max-w-[120px] truncate' : 'text-green-300'}>
-                {error || 'No errors'}
-              </span>
-              <span className="text-white/60">|</span>
-              <span className="text-white/50">
-                ID: <span className="font-mono text-white/70">{peerId.slice(0, 12)}…</span>
-              </span>
+
+            <div className="grid gap-4 p-4 sm:grid-cols-[auto_1fr] sm:items-center">
+              {status === 'ready' && peerId ? (
+                <div className="rounded-2xl border border-white/10 bg-white p-2 shadow-lg">
+                  <QRCodeSVG value={joinUrl} size={104} />
+                </div>
+              ) : (
+                <div className="flex h-[124px] w-[124px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-center text-xs font-medium uppercase tracking-[0.25em] text-white/35">
+                  Waiting
+                  <br />
+                  for room
+                </div>
+              )}
+
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-white/65">
+                  {status === 'ready' && peerId
+                    ? 'Scan to join from a phone or another device.'
+                    : status === 'failed'
+                      ? 'Connection needs attention before the table is available.'
+                      : 'Preparing the host room and signaling connection.'}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/85">
+                    Room: <span className="font-mono text-white">{peerId ? peerId.slice(0, 12) : '—'}</span>
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/85">
+                    Players: <span className="font-mono text-white">{playerCount}</span>
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/85">
+                    Deck: <span className="font-mono text-white">{gameState.deckCount}</span>
+                  </span>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-relaxed text-white/65">
+                  {status === 'failed' && error ? error : 'Drag cards directly on the table. Use the stack only when you need to reshuffle, recenter, or recover a batch.'}
+                </div>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="absolute top-4 left-4 bg-black/60 border border-white/20 p-4 rounded-lg flex gap-4 items-center mt-8 pointer-events-auto">
-            <div className="flex flex-col">
-              <h2 className={`text-xl font-bold ${status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
-                {status === 'failed' ? 'Connection Failed' : 'Host Not Ready'}
-              </h2>
-              <p className="text-sm opacity-80 mt-1 max-w-xs break-words">
-                {status === 'failed' && error ? error : 'Waiting for connection...'}
-              </p>
-              {status === 'failed' && (
+
+            {status !== 'ready' && (
+              <div className="border-t border-white/10 px-4 py-3">
                 <button
                   onClick={retry}
-                  className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg active:scale-95 transition-all"
+                  className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/15 active:scale-95"
                 >
                   Retry Connection
                 </button>
-              )}
+              </div>
+            )}
+          </div>
+
+          <div className="pointer-events-auto flex flex-wrap gap-3 md:justify-end">
+            <div className="flex min-w-[8.5rem] flex-col rounded-[1.35rem] border border-white/10 bg-slate-950/55 px-4 py-3 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/45">Players</span>
+              <span className="mt-2 text-3xl font-semibold text-white">{playerCount}</span>
+              <span className="text-xs text-white/50">Connected seats</span>
+            </div>
+
+            <div className="flex min-w-[8.5rem] flex-col rounded-[1.35rem] border border-white/10 bg-slate-950/55 px-4 py-3 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/45">Deck</span>
+              <span className="mt-2 text-3xl font-semibold text-white">{gameState.deckCount}</span>
+              <span className="text-xs text-white/50">Cards remaining</span>
+            </div>
+
+            <div className="flex min-w-[8.5rem] flex-col rounded-[1.35rem] border border-white/10 bg-slate-950/55 px-4 py-3 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/45">Discard</span>
+              <span className="mt-2 text-3xl font-semibold text-white">{gameState.discardPile.length}</span>
+              <span className="text-xs text-white/50">In the discard pile</span>
             </div>
           </div>
-        )}
+        </header>
 
-        <div className="flex-grow flex items-center justify-center pointer-events-none relative">
-          {/* Play Area Overlay */}
-          <div className="relative w-64 h-64 flex items-center justify-center -translate-y-24">
+        <div className="relative flex flex-1 items-center justify-center px-4 pb-28 pt-4 md:pb-24">
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 mx-auto h-[32rem] w-[32rem] max-w-[82vw] -translate-y-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
+
+          <div className="relative flex h-72 w-72 items-center justify-center md:h-80 md:w-80">
+            <div className="pointer-events-none absolute inset-0 rounded-full border border-emerald-300/10 bg-emerald-950/10 shadow-[0_0_100px_rgba(16,185,129,0.15)]" />
+            <div className="pointer-events-none absolute inset-6 rounded-full border border-white/5" />
+
             {gameState.playStack.map((batch, batchIndex) => {
-              // Offset each batch slightly so we can see the stack
               const offsetX = batchIndex * 10;
               const offsetY = batchIndex * -10;
-              const rotation = (batchIndex % 3 - 1) * 5; // slight rotation -5, 0, 5
+              const rotation = (batchIndex % 3 - 1) * 5;
               const isTopBatch = batchIndex === gameState.playStack.length - 1;
 
               return (
                 <div
                   key={batchIndex}
-                  className={`absolute transition-all duration-300 pointer-events-auto ${isTopBatch ? 'ring-4 ring-yellow-400 scale-105 rounded-xl z-50' : 'shadow-2xl opacity-60'}`}
+                  className={`absolute transition-all duration-300 ${isTopBatch ? 'z-20' : 'opacity-80'}`}
                   style={{
                     transform: `translate(${offsetX}px, ${offsetY}px) rotate(${rotation}deg)`,
                     zIndex: isTopBatch ? 100 : batchIndex,
                   }}
                 >
                   {isTopBatch && (
-                    <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-1 z-50">
-                      <div className="bg-yellow-400 text-black text-xs font-black px-2 py-0.5 rounded shadow-lg whitespace-nowrap">
-                        LATEST BATCH
+                    <div className="absolute -top-14 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-2">
+                      <div className="rounded-full border border-amber-200/30 bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-[0.35em] text-black shadow-lg">
+                        Latest Batch
                       </div>
-                      <div className="flex gap-1">
+                      <div className="flex gap-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent('host-return-batch', { detail: { toTop: true } }));
                           }}
-                          className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded border border-blue-400/50 transition-colors whitespace-nowrap shadow-md"
+                          className="rounded-full border border-sky-300/40 bg-sky-500/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-lg transition-colors hover:bg-sky-400 active:scale-95"
                         >
-                          ↑ Return to Deck Top
+                          Return to Deck Top
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent('host-return-batch', { detail: { toTop: false } }));
                           }}
-                          className="bg-slate-700 hover:bg-slate-600 text-white text-[10px] px-2 py-0.5 rounded border border-slate-500/50 transition-colors whitespace-nowrap shadow-md"
+                          className="rounded-full border border-white/15 bg-slate-700/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-lg transition-colors hover:bg-slate-600 active:scale-95"
                         >
-                          ↓ Return to Deck Bottom
+                          Return to Deck Bottom
                         </button>
                       </div>
                     </div>
                   )}
+
                   <div className="flex -space-x-12">
                     {batch.map((card, cardIndex) => {
-                      const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
+                      const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-slate-950';
                       return (
                         <div
                           key={card.id}
-                          className="w-24 h-36 bg-white rounded-lg shadow-md border border-gray-300 flex flex-col justify-between p-2 relative cursor-pointer hover:-translate-y-2 hover:shadow-xl transition-transform"
+                          className="relative flex h-36 w-24 cursor-pointer flex-col justify-between rounded-xl border border-slate-200 bg-white p-2 shadow-[0_18px_30px_rgba(15,23,42,0.25)] transition-transform hover:-translate-y-2 hover:shadow-[0_24px_45px_rgba(15,23,42,0.3)]"
                           style={{ zIndex: cardIndex }}
                           onPointerDown={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             window.dispatchEvent(new CustomEvent('host-drag-public-card', {
-                              detail: { cardData: card, x: e.clientX, y: e.clientY }
+                              detail: {
+                                cardData: card,
+                                x: e.clientX,
+                                y: e.clientY,
+                                pointerId: e.pointerId,
+                              },
                             }));
                           }}
                         >
                           <div className={`text-sm font-bold ${color}`}>{card.rank}</div>
                           <div className={`text-2xl self-center ${color}`}>
-                            {card.suit === 'hearts' && '♥'}
-                            {card.suit === 'diamonds' && '♦'}
-                            {card.suit === 'clubs' && '♣'}
-                            {card.suit === 'spades' && '♠'}
-                            {card.suit === 'none' && '🃏'}
+                            <SuitGlyph suit={card.suit} />
                           </div>
                           <div className={`text-sm font-bold rotate-180 ${color}`}>{card.rank}</div>
                         </div>
@@ -185,105 +243,115 @@ export default function Host() {
                 </div>
               );
             })}
+
             {gameState.playStack.length === 0 && (
-              <div className="text-emerald-300/50 font-bold text-2xl uppercase tracking-widest border-2 border-dashed border-emerald-400/30 bg-black/20 px-8 py-12 rounded-2xl flex flex-col items-center">
-                <span>{DEFAULT_SANDBOX_PACK.containers.playStack.emptyText}</span>
-                <span className="text-sm font-normal mt-2 text-emerald-300/20 text-center normal-case tracking-normal" dangerouslySetInnerHTML={{ __html: DEFAULT_SANDBOX_PACK.containers.playStack.emptySubText || '' }}></span>
+              <div className="rounded-[1.75rem] border border-dashed border-emerald-300/20 bg-black/20 px-10 py-12 text-center text-emerald-100/60 shadow-[0_18px_45px_rgba(2,6,23,0.25)] backdrop-blur-sm">
+                <div className="text-2xl font-semibold uppercase tracking-[0.35em] text-emerald-200/55">
+                  {DEFAULT_SANDBOX_PACK.containers.playStack.emptyText}
+                </div>
+                <div
+                  className="mt-3 text-sm leading-relaxed text-emerald-100/30"
+                  dangerouslySetInnerHTML={{ __html: DEFAULT_SANDBOX_PACK.containers.playStack.emptySubText || '' }}
+                />
               </div>
             )}
-            <div className="absolute -bottom-16 text-center z-10 pointer-events-none flex flex-col items-center">
-              <div className="text-white/50 font-bold text-sm uppercase tracking-widest">
+
+            <div className="absolute -bottom-20 flex flex-col items-center text-center">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.38em] text-white/45">
                 {DEFAULT_SANDBOX_PACK.containers.playStack.label}
               </div>
-              <div className="text-white/40 text-xs font-medium mt-1 mb-2">
-                {gameState.playStack.reduce((acc, batch) => acc + batch.length, 0)} cards in stack
+              <div className="mt-2 text-xs text-white/45">
+                {stackCardCount} cards in stack
               </div>
               {gameState.playStack.length > 0 ? (
                 <button
-                  onClick={() => window.dispatchEvent(new Event('host-clear-table'))}
-                  className="pointer-events-auto bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-black px-6 py-2 rounded-full border-2 border-amber-200 text-sm uppercase tracking-wider font-bold transition-all shadow-[0_0_20px_rgba(245,158,11,0.6)] active:scale-95"
+                  onClick={() => {
+                    window.dispatchEvent(new Event('host-clear-table'));
+                    playShuffleSound();
+                  }}
+                  className="pointer-events-auto mt-4 rounded-full border border-amber-200/30 bg-gradient-to-b from-amber-300 to-amber-500 px-6 py-2 text-sm font-extrabold uppercase tracking-[0.18em] text-black shadow-[0_0_24px_rgba(245,158,11,0.28)] transition-transform hover:from-amber-200 hover:to-amber-400 active:scale-95"
                 >
                   {DEFAULT_SANDBOX_PACK.containers.playStack.actionButtonText}
                 </button>
               ) : (
-                <button
-                  disabled
-                  className="pointer-events-auto bg-gray-800/50 text-gray-500 px-4 py-1.5 rounded-full border border-gray-600/50 text-xs uppercase tracking-wider font-bold cursor-not-allowed shadow-none"
-                >
+                <div className="pointer-events-auto mt-4 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/35">
                   {DEFAULT_SANDBOX_PACK.containers.playStack.disabledButtonText}
-                </button>
+                </div>
               )}
             </div>
           </div>
-        </div>
 
-        <div className="absolute top-4 right-4 flex gap-4 pointer-events-auto">
-          {DEFAULT_SANDBOX_PACK.layoutOrder.map((containerId) => {
-            if (containerId === 'discardPile') {
-              return (
-                <div
-                  key="discardPile"
-                  className={`w-32 h-48 rounded-xl shadow-lg border-2 flex flex-col items-center justify-center transition-opacity ${gameState.discardPile.length > 0 ? 'opacity-100 border-solid border-gray-400 bg-gray-800' : 'opacity-50 border-dashed border-gray-500 bg-gray-900/80'}`}
-                >
-                  <div className="text-gray-400 font-bold mb-2 text-sm uppercase tracking-widest">{DEFAULT_SANDBOX_PACK.containers.discardPile.label}</div>
-                  <div className="text-2xl font-black text-gray-500">{gameState.discardPile.length}</div>
+          <div className="pointer-events-auto absolute right-4 top-4 flex flex-col gap-4">
+            {DEFAULT_SANDBOX_PACK.layoutOrder.map((containerId) => {
+              if (containerId === 'discardPile') {
+                return (
+                  <div
+                    key="discardPile"
+                    className={`flex h-48 w-32 flex-col items-center justify-center rounded-[1.5rem] border shadow-[0_20px_55px_rgba(2,6,23,0.35)] backdrop-blur-xl transition-opacity ${gameState.discardPile.length > 0 ? 'border-white/10 bg-slate-950/70 opacity-100' : 'border-white/10 bg-slate-950/55 opacity-70'}`}
+                  >
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.35em] text-white/45">{DEFAULT_SANDBOX_PACK.containers.discardPile.label}</div>
+                    <div className="mt-2 text-4xl font-semibold text-white">{gameState.discardPile.length}</div>
 
-                  {gameState.discardPile.length > 0 && (
-                    <div className="mt-3 bg-white w-16 h-20 rounded shadow flex flex-col items-center justify-center p-1 transform rotate-6">
-                      <span className={`text-sm font-bold ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
-                        {gameState.discardPile[gameState.discardPile.length - 1].rank}
-                      </span>
-                      <span className={`text-xl ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
-                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' && '♥'}
-                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' && '♦'}
-                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'clubs' && '♣'}
-                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'spades' && '♠'}
-                        {gameState.discardPile[gameState.discardPile.length - 1].suit === 'none' && '🃏'}
-                      </span>
-                    </div>
-                  )}
-                  {gameState.discardPile.length === 0 && <div className="text-gray-500 text-xs mt-2 font-medium">{DEFAULT_SANDBOX_PACK.containers.discardPile.emptyText}</div>}
-                </div>
-              );
-            }
-            if (containerId === 'deck') {
-              return (
-                <div
-                  key="deck"
-                  className={`w-32 h-48 bg-blue-900 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center transition-colors ring-2 ring-blue-400/50 ${gameState.deckCount > 0 ? '' : 'opacity-50'}`}
-                >
-                  <div className="text-white/80 font-bold mb-2">{DEFAULT_SANDBOX_PACK.containers.deck.label}</div>
-                  <div className="text-3xl font-black">{gameState.deckCount}</div>
-                </div>
-              );
-            }
-            return null;
-          })}
+                    {gameState.discardPile.length > 0 ? (
+                      <div className="mt-4 flex h-20 w-16 flex-col items-center justify-center rounded-lg bg-white p-1 shadow-md rotate-6">
+                        <span className={`text-sm font-bold ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-slate-950'}`}>
+                          {gameState.discardPile[gameState.discardPile.length - 1].rank}
+                        </span>
+                        <span className={`text-xl ${gameState.discardPile[gameState.discardPile.length - 1].suit === 'hearts' || gameState.discardPile[gameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-slate-950'}`}>
+                          <SuitGlyph suit={gameState.discardPile[gameState.discardPile.length - 1].suit} />
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-3 text-xs font-medium text-white/40">{DEFAULT_SANDBOX_PACK.containers.discardPile.emptyText}</div>
+                    )}
+                  </div>
+                );
+              }
 
-          {/* Reset & Shuffle (Discard) */}
-          <div
-            onClick={() => {
-              resetGame();
-              playShuffleSound();
-            }}
-            className="w-32 h-48 bg-red-900/80 hover:bg-red-800 rounded-xl shadow-lg border-2 border-white/50 flex flex-col items-center justify-center cursor-pointer transition-colors active:scale-95"
-          >
-             <div className="text-white font-bold mb-2 text-center px-2">Reset & Shuffle</div>
-             <div className="text-xl">↺</div>
+              if (containerId === 'deck') {
+                return (
+                  <div
+                    key="deck"
+                    className={`flex h-48 w-32 flex-col items-center justify-center rounded-[1.5rem] border shadow-[0_20px_55px_rgba(2,6,23,0.35)] ring-1 ring-blue-400/20 transition-colors ${gameState.deckCount > 0 ? 'border-blue-300/40 bg-gradient-to-b from-blue-950/90 to-sky-950/80' : 'border-white/10 bg-slate-950/55 opacity-70'}`}
+                  >
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.35em] text-white/55">{DEFAULT_SANDBOX_PACK.containers.deck.label}</div>
+                    <div className="mt-2 text-4xl font-semibold text-white">{gameState.deckCount}</div>
+                  </div>
+                );
+              }
+
+              return null;
+            })}
+
+            <button
+              onClick={() => {
+                resetGame();
+                playShuffleSound();
+              }}
+              className="flex h-48 w-32 flex-col items-center justify-center rounded-[1.5rem] border border-rose-300/30 bg-gradient-to-b from-rose-950/85 to-red-900/80 text-white shadow-[0_20px_55px_rgba(2,6,23,0.35)] transition-transform hover:from-rose-900 hover:to-red-800 active:scale-95"
+            >
+              <div className="text-center text-sm font-semibold uppercase tracking-[0.18em] text-white/95 px-3">
+                Reset & Shuffle
+              </div>
+              <div className="mt-3 text-2xl">↺</div>
+            </button>
           </div>
-        </div>
 
-        {/* Navigation Affordance / Controls */}
-        <div className="absolute bottom-4 left-4 bg-black/60 border border-white/20 p-3 rounded-lg text-white/90 text-sm flex gap-4 pointer-events-auto backdrop-blur-sm shadow-lg">
-          <span className="flex items-center gap-2 text-yellow-300 font-bold border border-yellow-500/50 bg-yellow-900/30 px-2 py-0.5 rounded">🃏 Drag center cards to deal</span>
-          <span className="flex items-center gap-2">🖐️ Drag to pan</span>
-          <span className="flex items-center gap-2">🔍 Scroll to zoom</span>
-          <button
-            onClick={() => window.dispatchEvent(new Event('table-recenter'))}
-            className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded transition-colors active:scale-95"
-          >
-            Recenter View
-          </button>
+          <footer className="pointer-events-auto absolute bottom-4 left-4 right-4 flex flex-col gap-3 rounded-[1.4rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white/85 shadow-[0_20px_60px_rgba(2,6,23,0.38)] backdrop-blur-xl md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full border border-emerald-300/20 bg-emerald-500/10 px-3 py-1 font-medium text-emerald-200">
+                🃏 Drag center cards to deal
+              </span>
+              <span className="text-white/45">Pan with drag, zoom with wheel</span>
+            </div>
+
+            <button
+              onClick={() => window.dispatchEvent(new Event('table-recenter'))}
+              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/10 px-4 py-2 font-medium text-white transition-colors hover:bg-white/15 active:scale-95"
+            >
+              Recenter View
+            </button>
+          </footer>
         </div>
       </div>
     </div>
