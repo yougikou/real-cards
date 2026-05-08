@@ -55,13 +55,35 @@ export default function Host() {
 
       <div className="absolute inset-0 z-10 pointer-events-none flex flex-col p-4 text-white">
         {status === 'ready' && peerId ? (
-          <div className="absolute top-4 left-4 bg-white/10 p-4 rounded-lg flex gap-4 items-center mt-8">
-            <div className="bg-white p-2 rounded">
-              <QRCodeSVG value={joinUrl} size={100} />
+          <div className="absolute top-4 left-4 bg-white/10 p-4 rounded-lg flex flex-col gap-3 mt-8">
+            <div className="flex gap-4 items-center">
+              <div className="bg-white p-2 rounded">
+                <QRCodeSVG value={joinUrl} size={100} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Scan to Join</h2>
+                <p className="text-sm opacity-80 mt-1">Room ID: {peerId}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold">Scan to Join</h2>
-              <p className="text-sm opacity-80 mt-1">Room ID: {peerId}</p>
+            {/* Host Status Panel */}
+            <div className="flex items-center gap-3 text-xs bg-black/40 rounded-md px-3 py-2 border border-white/10">
+              <span className="flex items-center gap-1.5 text-green-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                Live
+              </span>
+              <span className="text-white/60">|</span>
+              <span className="text-white/70">
+                <span className="text-white/50">Peers: </span>
+                <span className="font-mono text-white/90 font-bold">{Object.keys(gameState.players).length}</span>
+              </span>
+              <span className="text-white/60">|</span>
+              <span className={error ? 'text-red-300 max-w-[120px] truncate' : 'text-green-300'}>
+                {error || 'No errors'}
+              </span>
+              <span className="text-white/60">|</span>
+              <span className="text-white/50">
+                ID: <span className="font-mono text-white/70">{peerId.slice(0, 12)}…</span>
+              </span>
             </div>
           </div>
         ) : (
