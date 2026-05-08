@@ -8,7 +8,11 @@ export function useHost() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
+  const statusRef = useRef(status);
+  useEffect(() => { statusRef.current = status; }, [status]);
+
   const [peerId, setPeerId] = useState<string>('');
+
   const [gameState, setGameState] = useState<GameState>({
     deckCount: 54,
     discardPile: [],
@@ -20,6 +24,7 @@ export function useHost() {
     setStatus('starting');
     setError(null);
     setRetryCount(prev => prev + 1);
+    targetIdRef.current = null; // Force fresh peer ID — stale IDs get stuck in 'starting'
   };
 
   const peerRef = useRef<Peer | null>(null);
@@ -446,10 +451,30 @@ export function useHost() {
 
     peer.on('error', (err) => {
       if (isCleaningUp) return;
-      // Filter out non-fatal errors to prevent crashing the host
       const type = err.type as string;
-      if (type === 'peer-unavailable' || type === 'network' || type === 'server-error' || type === 'webrtc') {
+      if (type === 'network' || type === 'server-error' || type === 'webrtc') {
         console.warn(`Non-fatal host error: ${type} - ${err.message}`);
+        return;
+      }
+      if (type === 'peer-unavailable') {
+        const curStatus = statusRef.current;
+        if (curStatus === 'starting' && targetIdRef.current !== null) {
+          // Retry with stale peer ID — auto-recover with a fresh ID
+          console.warn(`Stale peer ID "${targetIdRef.current}" on retry, generating fresh ID`);
+          targetIdRef.current = null;
+          setRetryCount(prev => prev + 1);
+          return;
+        }
+        if (curStatus === 'reconnecting') {
+          console.warn(`Reconnect failed with stale ID, falling back to fresh session`);
+          targetIdRef.current = null;
+          setStatus('failed');
+          setError('Reconnection failed. Retry with fresh ID.');
+          return;
+        }
+        // First-connection peer-unavailable (e.g., ID collision)
+        setStatus('failed');
+        setError(`Peer ID unavailable: ${err.message}`);
         return;
       }
       setStatus('failed');
