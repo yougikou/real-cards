@@ -19,6 +19,7 @@ class TableScene extends Phaser.Scene {
   private dragConstraint: MatterJS.ConstraintType | null = null;
   private dragCard: Phaser.Physics.Matter.Image | null = null;
   private dragShadow: Phaser.GameObjects.Image | null = null;
+  private activeDragPointerId: number | null = null;
   private pointerBody: MatterJS.BodyType | null = null;
   private deckText: Phaser.GameObjects.Text | null = null;
 
@@ -90,6 +91,12 @@ class TableScene extends Phaser.Scene {
           card.destroy();
         }
       }
+
+      this.dragCard = null;
+      this.dragShadow?.destroy();
+      this.dragShadow = null;
+      this.dragConstraint = null;
+      this.activeDragPointerId = null;
     };
     window.addEventListener('table-reset', onTableReset);
 
@@ -107,11 +114,10 @@ class TableScene extends Phaser.Scene {
     window.addEventListener('players-updated', onPlayersUpdated);
 
     const onHostDragPublicCard = (e: Event) => {
-      const customEvent = e as CustomEvent<{ cardData: unknown, x: number, y: number }>;
-      const { cardData, x, y } = customEvent.detail;
+      const customEvent = e as CustomEvent<{ cardData: unknown, x: number, y: number, pointerId?: number }>;
+      const { cardData, x, y, pointerId } = customEvent.detail;
       const worldPoint = this.cameras.main.getWorldPoint(x, y);
 
-      // Spawn card and set it as the dragged card
       if (!this.matter) return;
       const newCard = this.matter.add.image(worldPoint.x, worldPoint.y, 'cardFront', undefined, {
           mass: 0.1,
@@ -127,6 +133,7 @@ class TableScene extends Phaser.Scene {
       newCard.setScale(1.1);
       newCard.setDepth(100);
       this.dragCard = newCard;
+      this.activeDragPointerId = typeof pointerId === 'number' ? pointerId : null;
 
       this.dragShadow = this.add.image(worldPoint.x + 10, worldPoint.y + 10, 'cardFront');
       this.dragShadow.setTint(0x000000);
@@ -134,7 +141,6 @@ class TableScene extends Phaser.Scene {
       this.dragShadow.setScale(1.1);
       this.dragShadow.setDepth(99);
 
-      // Force pointer constraint bind using latest active pointer
       if (this.pointerBody && newCard.body) {
          this.matter.body.setPosition(this.pointerBody, { x: worldPoint.x, y: worldPoint.y });
          this.dragConstraint = this.matter.add.constraint(
@@ -367,6 +373,7 @@ class TableScene extends Phaser.Scene {
     newCard.setScale(1.1);
     newCard.setDepth(100);
     this.dragCard = newCard;
+    this.activeDragPointerId = pointer.id;
 
     this.dragShadow = this.add.image(startX + 10, startY + 10, 'cardFront');
     this.dragShadow.setTint(0x000000);
@@ -396,23 +403,26 @@ class TableScene extends Phaser.Scene {
 
   private setupInteractions() {
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-        if (this.dragCard && this.pointerBody && this.dragConstraint && this.matter) {
+        const isActiveDragPointer = this.activeDragPointerId === null || pointer.id === this.activeDragPointerId;
+
+        if (this.dragCard && this.pointerBody && this.dragConstraint && this.matter && isActiveDragPointer) {
              this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
              if (this.dragShadow) {
                  this.dragShadow.setPosition(this.dragCard.x + 15, this.dragCard.y + 15);
                  this.dragShadow.setRotation(this.dragCard.rotation);
              }
              this.updateZoneLabels();
-        } else if (pointer.isDown) {
+        } else if (!this.dragCard && pointer.isDown) {
              this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
              this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
         }
     });
 
-    this.input.on('pointerup', () => {
-         if (this.dragCard) {
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+         if (this.dragCard && (this.activeDragPointerId === null || pointer.id === this.activeDragPointerId)) {
              this.releaseCard(this.dragCard);
              this.dragCard = null;
+             this.activeDragPointerId = null;
 
              if (this.dragShadow) {
                  this.dragShadow.destroy();

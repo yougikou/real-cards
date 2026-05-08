@@ -1,38 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useClient } from '../hooks/useClient';
-import type { Card, Suit, Rank } from '../types';
-import { playDrawSound } from '../utils/audio/draw';
+import type { Card, GameState, Suit } from '../types';
 import { playCardSound } from '../utils/audio/playCard';
+import { playDrawSound } from '../utils/audio/draw';
 import { playReturnSound } from '../utils/audio/returnCard';
 import { DEFAULT_SANDBOX_PACK } from '../config/tableConfig';
 
-const SUIT_ORDER: Record<Suit, number> = {
-  hearts: 1,
-  diamonds: 2,
-  clubs: 3,
-  spades: 4,
-  none: 5,
+const SUIT_SYMBOLS: Record<Suit, string> = {
+  hearts: '♥',
+  diamonds: '♦',
+  clubs: '♣',
+  spades: '♠',
+  none: '🃏',
 };
-
-const RANK_ORDER: Record<Rank, number> = {
-  'JOKER': 1,
-  '2': 2,
-  'A': 3,
-  'K': 4,
-  'Q': 5,
-  'J': 6,
-  '10': 7,
-  '9': 8,
-  '8': 9,
-  '7': 10,
-  '6': 11,
-  '5': 12,
-  '4': 13,
-  '3': 14,
-};
-
-type SortMode = 'draw' | 'suit' | 'rank' | 'free';
 
 const MOCK_HAND: Card[] = [
   { id: 'mock-1', suit: 'spades', rank: 'A' },
@@ -44,31 +25,39 @@ const MOCK_HAND: Card[] = [
   { id: 'mock-7', suit: 'none', rank: 'JOKER' },
 ];
 
-import type { GameState } from '../types';
-
 const MOCK_GAME_STATE: GameState = {
   deckCount: 42,
   discardPile: [],
   playStack: [
-    [
-      { id: 'mock-history-0', suit: 'spades', rank: '2' }
-    ],
+    [{ id: 'mock-history-0', suit: 'spades', rank: '2' }],
     [
       { id: 'mock-history-1', suit: 'hearts', rank: '3' },
-      { id: 'mock-history-2', suit: 'diamonds', rank: '3' }
-    ]
+      { id: 'mock-history-2', suit: 'diamonds', rank: '3' },
+    ],
   ],
   players: {
     'mock-peer-1': { id: 'mock-peer-1', name: 'Alice', handCount: 5 },
-    'mock-peer-2': { id: 'mock-peer-2', name: 'Bob', handCount: 3 }
-  }
+    'mock-peer-2': { id: 'mock-peer-2', name: 'Bob', handCount: 3 },
+  },
 };
+
+function isRedSuit(suit: Suit) {
+  return suit === 'hearts' || suit === 'diamonds';
+}
+
+function cardTone(card: Card) {
+  return isRedSuit(card.suit) ? 'text-red-600' : 'text-slate-900';
+}
+
+function deckCardTone(card: Card) {
+  return isRedSuit(card.suit) ? 'text-red-500' : 'text-slate-900';
+}
 
 export default function Client() {
   const { hostId } = useParams<{ hostId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const playerName = searchParams.get('name') || 'Player';
-  const isPreview = searchParams.get('preview') === 'true' || window.location.href.includes('preview=true');
+  const isPreview = searchParams.get('preview') === 'true';
 
   const {
     status: realStatus,
@@ -81,325 +70,64 @@ export default function Client() {
     playCards,
     returnCards,
     takeBackCards,
-    drawFromOther
+    drawFromOther,
   } = useClient(hostId!, playerName);
 
   const [localHand, setLocalHand] = useState<Card[]>(MOCK_HAND);
   const [localGameState, setLocalGameState] = useState<GameState>(MOCK_GAME_STATE);
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const [viewOther, setViewOther] = useState<string | null>(null);
+  const [stolenCardResult, setStolenCardResult] = useState<Card | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [recentlyDrawnCardIds, setRecentlyDrawnCardIds] = useState<string[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const status = isPreview ? 'connected' : realStatus;
   const hand = isPreview ? localHand : realHand;
   const activeGameState = isPreview ? localGameState : realGameState;
 
-  const [selectedCards, setSelectedCards] = useState<string[]>([]);
-  const [viewOther, setViewOther] = useState<string | null>(null);
-  const [stolenCardResult, setStolenCardResult] = useState<Card | null>(null);
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    window.setTimeout(() => setToastMessage(null), 2200);
+  };
 
-  // Draw feedback state
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [recentlyDrawnCardIds, setRecentlyDrawnCardIds] = useState<string[]>([]);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  useEffect(() => {
+    setSelectedCards(prev => prev.filter(id => hand.some(card => card.id === id)));
+  }, [hand]);
 
-  // Gesture state
-  const [touchStartY, setTouchStartY] = useState(0);
-
-  const [sortMode, setSortMode] = useState<SortMode>('draw');
-  const [customOrder, setCustomOrder] = useState<string[]>([]);
-
-  // Drag and drop state for FREE mode
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const dragStartPosRef = React.useRef<{ x: number; y: number } | null>(null);
-  const lastDragTimeRef = React.useRef<number>(0);
-
-
-  // Track newly drawn cards to apply visual highlights
-  const previousHandRef = React.useRef<Card[]>(hand);
-  React.useEffect(() => {
+  const previousHandRef = useRef<Card[]>(hand);
+  useEffect(() => {
     const previousHand = previousHandRef.current;
-
-    // Find newly added cards (cards in current hand that were not in previous hand)
     const newCards = hand.filter(card => !previousHand.some(prev => prev.id === card.id));
 
     if (newCards.length > 0 && !viewOther) {
-      const newCardIds = newCards.map(c => c.id);
+      const newCardIds = newCards.map(card => card.id);
       setRecentlyDrawnCardIds(prev => [...prev, ...newCardIds]);
       setToastMessage(`+${newCards.length} Card${newCards.length > 1 ? 's' : ''}`);
-
-      // Clear highlight and toast after 2500ms
-      setTimeout(() => {
+      window.setTimeout(() => {
         setRecentlyDrawnCardIds(prev => prev.filter(id => !newCardIds.includes(id)));
         setToastMessage(null);
-      }, 2500);
+      }, 2200);
     }
 
     previousHandRef.current = hand;
   }, [hand, viewOther]);
 
-  // Update custom order when hand changes but do not cause cascading renders
-  React.useEffect(() => {
-    setCustomOrder(prev => {
-      const newOrder = prev.filter(id => hand.some(c => c.id === id));
-      const missingIds = hand.filter(c => !newOrder.includes(c.id)).map(c => c.id);
-      if (newOrder.length === prev.length && missingIds.length === 0) {
-         return prev; // no changes
-      }
-      return [...newOrder, ...missingIds];
-    });
-  }, [hand]);
-
-  const displayHand = useMemo(() => {
-    if (sortMode === 'draw') return hand;
-
-    if (sortMode === 'free') {
-      return customOrder.map(id => hand.find(c => c.id === id)).filter(Boolean) as Card[];
-    }
-
-    return [...hand].sort((a, b) => {
-      if (sortMode === 'suit') {
-        const suitDiff = SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
-        if (suitDiff !== 0) return suitDiff;
-        return RANK_ORDER[a.rank] - RANK_ORDER[b.rank];
-      } else {
-        const rankDiff = RANK_ORDER[a.rank] - RANK_ORDER[b.rank];
-        if (rankDiff !== 0) return rankDiff;
-        return SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
-      }
-    });
-  }, [hand, sortMode, customOrder]);
-
-  const groupedHand = useMemo(() => {
-    if (sortMode === 'draw' || sortMode === 'free') return null;
-
-    return displayHand.reduce((acc, card) => {
-      let key = '';
-      if (sortMode === 'suit') {
-        key = card.suit === 'none' ? 'JOKERS' : card.suit.toUpperCase();
-      } else if (sortMode === 'rank') {
-        key = `RANK: ${card.rank}`;
-      }
-
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(card);
-      return acc;
-    }, {} as Record<string, Card[]>);
-  }, [displayHand, sortMode]);
+  const displayHand = useMemo(() => hand, [hand]);
+  const latestPlayBatch = useMemo(() => activeGameState?.playStack[activeGameState.playStack.length - 1] ?? null, [activeGameState]);
 
   const toggleSelect = (cardId: string) => {
-    setSelectedCards(prev =>
-      prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]
-    );
+    setSelectedCards(prev => (prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]));
   };
 
-
-
-
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>, index: number) => {
-    if (sortMode !== 'free') return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDraggedIndex(index);
-    setDragOverIndex(index);
-    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (draggedIndex === null || sortMode !== 'free') return;
-    // Only drag after moving 5px
-    if (dragStartPosRef.current) {
-        const dx = e.clientX - dragStartPosRef.current.x;
-        const dy = e.clientY - dragStartPosRef.current.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 5) return;
-    }
-
-    // Disable scrolling while dragging cards
-    e.preventDefault();
-
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const cardEl = el?.closest('[data-card-index]');
-    if (cardEl) {
-      const overIndex = parseInt(cardEl.getAttribute('data-card-index') || '-1', 10);
-      if (overIndex !== -1 && overIndex !== dragOverIndex) {
-        setDragOverIndex(overIndex);
-      }
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (draggedIndex === null || sortMode !== 'free') return;
-    e.currentTarget.releasePointerCapture(e.pointerId);
-
-    let didDrag = false;
-    if (dragStartPosRef.current) {
-        const dx = e.clientX - dragStartPosRef.current.x;
-        const dy = e.clientY - dragStartPosRef.current.y;
-        if (Math.sqrt(dx * dx + dy * dy) >= 5) {
-            didDrag = true;
-        }
-    }
-
-    if (didDrag && dragOverIndex !== null && dragOverIndex !== draggedIndex) {
-      setCustomOrder(prev => {
-        const newOrder = [...prev];
-        const item = newOrder.splice(draggedIndex, 1)[0];
-        newOrder.splice(dragOverIndex, 0, item);
-        return newOrder;
-      });
-    }
-
-    if (didDrag) {
-       lastDragTimeRef.current = Date.now();
-    }
-
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    dragStartPosRef.current = null;
-  };
-
-  const handlePlaySelected = () => {
-    const cardsToPlay = displayHand.filter(c => selectedCards.includes(c.id));
-    if (cardsToPlay.length > 0) {
-      if (navigator.vibrate) {
-        navigator.vibrate(20);
-      }
-      playCardSound();
-
-      if (isPreview) {
-        setLocalHand(prev => prev.filter(c => !cardsToPlay.map(sc => sc.id).includes(c.id)));
-        setLocalGameState(prev => ({
-          ...prev,
-          playStack: [...prev.playStack, cardsToPlay]
-        }));
-      } else {
-        playCards(cardsToPlay);
-      }
-      setSelectedCards([]);
-    }
-  };
-
-  const handleReturnSelected = (toTop: boolean) => {
-    const cardsToReturn = displayHand.filter(c => selectedCards.includes(c.id));
-    if (cardsToReturn.length > 0) {
-      if (navigator.vibrate) {
-        navigator.vibrate(15);
-      }
-      playReturnSound();
-
-      if (isPreview) {
-        setLocalHand(prev => prev.filter(c => !cardsToReturn.map(sc => sc.id).includes(c.id)));
-        setLocalGameState(prev => ({
-          ...prev,
-          deckCount: prev.deckCount + cardsToReturn.length
-        }));
-        window.alert(`Mock: ${cardsToReturn.length} card(s) returned to ${toTop ? 'TOP' : 'BOTTOM'} of deck.`);
-      } else {
-        returnCards(cardsToReturn, toTop);
-      }
-      setSelectedCards([]);
-    }
-  };
-
-  const handleTakeBack = () => {
-    if (activeGameState && activeGameState.playStack.length > 0) {
-      const topBatch = activeGameState.playStack[activeGameState.playStack.length - 1];
-      if (isPreview) {
-        setLocalGameState(prev => ({
-          ...prev,
-          playStack: prev.playStack.slice(0, -1)
-        }));
-        setLocalHand(prev => [...prev, ...topBatch]);
-      } else {
-        takeBackCards(topBatch);
-      }
-    }
-  };
-
-  const renderCard = (card: Card, index: number = -1) => {
-    const isSelected = selectedCards.includes(card.id);
-    const hasSelection = selectedCards.length > 0;
-    const isRecentlyDrawn = recentlyDrawnCardIds.includes(card.id);
-    const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
-
-    let cardClasses = 'bg-white hover:-translate-y-1';
-    if (sortMode === 'free' && index === draggedIndex && index !== -1) {
-      cardClasses = 'bg-yellow-50 ring-4 ring-yellow-400 scale-110 shadow-2xl z-50 opacity-90 rotate-3';
-    } else if (sortMode === 'free' && index === dragOverIndex && draggedIndex !== null && index !== draggedIndex && index !== -1) {
-      cardClasses = 'bg-white opacity-80 border-4 border-dashed border-blue-400 translate-x-2';
-    } else if (isSelected) {
-      cardClasses = 'bg-yellow-100 ring-8 ring-yellow-400 -translate-y-8 scale-110 shadow-[0_0_30px_rgba(250,204,21,0.6)] z-30';
-    } else if (hasSelection) {
-      cardClasses = 'bg-white opacity-40 saturate-50 scale-95';
-    } else if (isRecentlyDrawn) {
-      cardClasses = 'bg-green-100 ring-4 ring-green-500 scale-110 shadow-[0_0_25px_rgba(34,197,94,0.6)] z-20 -translate-y-4';
-    }
-
-    return (
-      <div
-        key={card.id}
-        data-card-index={index !== -1 ? index : undefined}
-        onPointerDown={(e) => index !== -1 && handlePointerDown(e, index)}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onClick={(e) => { if (Date.now() - lastDragTimeRef.current < 50) { e.preventDefault(); return; } toggleSelect(card.id); }}
-        className={`relative aspect-[2/3] rounded-lg shadow-md flex flex-col justify-between p-2 cursor-pointer transition-all duration-200 ${cardClasses} ${sortMode === 'free' ? 'touch-none' : ''}`}
-      >
-        {isSelected && (
-          <div className="absolute -top-4 -right-4 bg-yellow-400 border-4 border-gray-900 rounded-full w-12 h-12 flex items-center justify-center text-2xl font-black text-gray-900 z-30 shadow-2xl">
-            {selectedCards.indexOf(card.id) + 1}
-          </div>
-        )}
-        {isRecentlyDrawn && !isSelected && (
-          <div className="absolute -top-3 -right-3 bg-green-500 border-2 border-green-200 rounded px-2 py-0.5 flex items-center justify-center text-xs font-black text-white z-30 shadow-lg animate-bounce">
-            NEW
-          </div>
-        )}
-        <div className={`text-lg font-bold ${color}`}>{card.rank}</div>
-        <div className={`text-3xl self-center ${color}`}>
-          {card.suit === 'hearts' && '♥'}
-          {card.suit === 'diamonds' && '♦'}
-          {card.suit === 'clubs' && '♣'}
-          {card.suit === 'spades' && '♠'}
-          {card.suit === 'none' && '🃏'}
-        </div>
-        <div className="flex justify-between items-end">
-          <div />
-          <div className={`text-lg font-bold rotate-180 ${color} ml-1`}>{card.rank}</div>
-        </div>
-      </div>
-    );
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartY(e.touches[0].clientY);
-  };
-
-  const handleSwipeUpPlay = (e: React.TouchEvent) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    const dragY = touchEndY - touchStartY;
-
-    // Swiped UP
-    if (dragY < -50) {
-      handlePlaySelected();
-    }
-  };
-
-  const handleDrawAction = (e?: React.MouseEvent | React.TouchEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-
+  const handleDrawAction = () => {
     if (isDrawing) return;
 
     setIsDrawing(true);
-    setTimeout(() => setIsDrawing(false), 300);
+    window.setTimeout(() => setIsDrawing(false), 300);
 
-    // Haptic and audio feedback
-    if (navigator.vibrate) {
-      navigator.vibrate(15);
-    }
+    if (navigator.vibrate) navigator.vibrate(15);
     playDrawSound();
 
     if (isPreview) {
@@ -407,467 +135,517 @@ export default function Client() {
         const newCard: Card = { id: `mock-drawn-${Date.now()}`, suit: 'spades', rank: '7' };
         setLocalHand(prev => [...prev, newCard]);
         setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount - 1 }));
-        window.alert("Mock: 1 card drawn from deck.");
+        showToast('Drawn from deck');
       } else {
-        window.alert("Mock: Deck is empty.");
+        showToast('Deck is empty');
       }
     } else {
       drawCard(1);
     }
   };
 
-  const handleSwipeDownDrawReturn = (e: React.TouchEvent, toTop: boolean = false) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    const dragY = touchEndY - touchStartY;
+  const handlePlaySelected = () => {
+    const cardsToPlay = displayHand.filter(card => selectedCards.includes(card.id));
+    if (cardsToPlay.length === 0) return;
 
-    // Swiped DOWN
-    if (dragY > 50) {
-      if (selectedCards.length > 0) {
-        handleReturnSelected(toTop);
-      } else {
-        handleDrawAction();
-      }
+    if (navigator.vibrate) navigator.vibrate(20);
+    playCardSound();
+
+    if (isPreview) {
+      setLocalHand(prev => prev.filter(card => !cardsToPlay.some(selected => selected.id === card.id)));
+      setLocalGameState(prev => ({
+        ...prev,
+        playStack: [...prev.playStack, cardsToPlay],
+      }));
+      showToast(`Played ${cardsToPlay.length} card${cardsToPlay.length > 1 ? 's' : ''}`);
+    } else {
+      playCards(cardsToPlay);
+    }
+
+    setSelectedCards([]);
+  };
+
+  const handleReturnSelected = (toTop: boolean) => {
+    const cardsToReturn = displayHand.filter(card => selectedCards.includes(card.id));
+    if (cardsToReturn.length === 0) return;
+
+    if (navigator.vibrate) navigator.vibrate(15);
+    playReturnSound();
+
+    if (isPreview) {
+      setLocalHand(prev => prev.filter(card => !cardsToReturn.some(selected => selected.id === card.id)));
+      setLocalGameState(prev => ({
+        ...prev,
+        deckCount: prev.deckCount + cardsToReturn.length,
+      }));
+      showToast(`Returned to deck ${toTop ? 'top' : 'bottom'}`);
+    } else {
+      returnCards(cardsToReturn, toTop);
+    }
+
+    setSelectedCards([]);
+  };
+
+  const handleTakeBack = () => {
+    if (!activeGameState || activeGameState.playStack.length === 0) return;
+    const topBatch = activeGameState.playStack[activeGameState.playStack.length - 1];
+
+    if (isPreview) {
+      setLocalGameState(prev => ({
+        ...prev,
+        playStack: prev.playStack.slice(0, -1),
+      }));
+      setLocalHand(prev => [...prev, ...topBatch]);
+      showToast('Undo play');
+    } else {
+      takeBackCards(topBatch);
     }
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+  };
+
+  const handleHandGestureEnd = (e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    if (!start) return;
+
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const isVertical = Math.abs(dy) >= Math.abs(dx);
+
+    if (selectedCards.length > 0) {
+      if (isVertical && dy < -50) {
+        handlePlaySelected();
+      } else if (isVertical && dy > 50) {
+        handleReturnSelected(false);
+      }
+    } else if (isVertical && dy > 55) {
+      handleDrawAction();
+    }
+
+    touchStartRef.current = null;
+  };
+
+  const handleActionDockGestureEnd = (e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    if (!start) return;
+
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const isVertical = Math.abs(dy) >= Math.abs(dx);
+
+    if (selectedCards.length > 0) {
+      if (isVertical && dy < -50) {
+        handlePlaySelected();
+      } else if (isVertical && dy > 50) {
+        handleReturnSelected(false);
+      } else if (!isVertical && dx < -50) {
+        handleReturnSelected(true);
+      } else if (!isVertical && dx > 50) {
+        handleReturnSelected(false);
+      }
+    } else if (isVertical && dy > 55) {
+      handleDrawAction();
+    }
+
+    touchStartRef.current = null;
+  };
+
+  const renderCard = (card: Card, index = 0, total = 1) => {
+    const isSelected = selectedCards.includes(card.id);
+    const hasSelection = selectedCards.length > 0;
+    const isRecentlyDrawn = recentlyDrawnCardIds.includes(card.id);
+    const tone = cardTone(card);
+    const suitIcon = SUIT_SYMBOLS[card.suit];
+    const spread = total > 1 ? (index / (total - 1)) * 2 - 1 : 0;
+    const fanTilt = spread * 7;
+    const fanLift = Math.abs(spread) * 10;
+
+    return (
+      <button
+        key={card.id}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleSelect(card.id);
+        }}
+        className={`relative aspect-[2/3] rounded-[1.25rem] bg-gradient-to-b from-white to-slate-100 shadow-[0_10px_24px_rgba(0,0,0,0.22)] border border-white/80 flex flex-col justify-between p-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-400/80 ${isSelected ? 'ring-4 ring-amber-400 z-30' : ''} ${hasSelection && !isSelected ? 'opacity-60 saturate-50' : ''} ${isRecentlyDrawn ? 'ring-4 ring-emerald-400 shadow-[0_0_24px_rgba(34,197,94,0.45)] z-20' : ''}`}
+        style={{
+          transform: `translateY(${fanLift + (isSelected ? -18 : 0)}px) rotate(${fanTilt}deg) scale(${isSelected ? 1.06 : hasSelection ? 0.96 : 1})`,
+          zIndex: isSelected ? 40 : 10 + index,
+          minWidth: '5.8rem',
+        }}
+      >
+        {isSelected && (
+          <div className="absolute -top-3 -right-3 h-8 w-8 rounded-full bg-amber-400 text-slate-950 border-2 border-slate-950 flex items-center justify-center text-sm font-black shadow-lg">
+            {selectedCards.indexOf(card.id) + 1}
+          </div>
+        )}
+        {isRecentlyDrawn && !isSelected && (
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black shadow-lg">
+            NEW
+          </div>
+        )}
+
+        <div className="flex items-start justify-between">
+          <div className={`text-lg font-black leading-none ${tone}`}>{card.rank}</div>
+          <div className={`text-[0.7rem] font-black uppercase tracking-[0.24em] ${isRedSuit(card.suit) ? 'text-red-500/80' : 'text-slate-500'}`}>
+            {card.suit === 'none' ? 'wild' : card.suit}
+          </div>
+        </div>
+
+        <div className={`self-center text-4xl leading-none ${tone}`}>{suitIcon}</div>
+
+        <div className="flex items-end justify-between">
+          <div className={`text-lg font-black leading-none rotate-180 ${tone}`}>{card.rank}</div>
+          <div className={`text-xl leading-none rotate-180 ${tone}`}>{suitIcon}</div>
+        </div>
+      </button>
+    );
+  };
+
+  const renderMiniCard = (card: Card) => {
+    const tone = deckCardTone(card);
+    const suitIcon = SUIT_SYMBOLS[card.suit];
+
+    return (
+      <div
+        key={card.id}
+        className="w-12 h-16 rounded-lg bg-white shadow-md border border-slate-300 flex flex-col justify-between p-1 flex-shrink-0"
+      >
+        <div className={`text-xs font-black leading-none ${tone}`}>{card.rank}</div>
+        <div className={`text-lg self-center leading-none ${tone}`}>{suitIcon}</div>
+      </div>
+    );
+  };
 
   if (status !== 'connected') {
     return (
-      <div className="flex flex-col justify-center items-center h-screen bg-gray-900 text-white p-4">
-        {status === 'failed' ? (
-          <div className="text-center">
-            <div className="text-red-500 text-2xl font-bold mb-4">Connection Failed</div>
-            <div className="text-gray-300 mb-6">{error}</div>
-            <button
-              onClick={retry}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg active:scale-95 transition-all"
-            >
-              Retry Connection
-            </button>
-          </div>
-        ) : (
-          <div className="text-center">
-            <div className="animate-pulse text-2xl font-bold mb-4">
-              {status === 'retrying' ? 'Retrying connection...' : status === 'reconnecting' ? 'Reconnecting to server...' : 'Connecting to Host...'}
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#1f2937_0%,_#020617_70%)] text-white p-5 flex flex-col items-center justify-center">
+        <div className="w-full max-w-sm rounded-[1.75rem] border border-white/10 bg-white/5 backdrop-blur-xl p-5 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+          {status === 'failed' ? (
+            <div className="text-center">
+              <div className="text-rose-400 text-2xl font-black mb-2">Connection Failed</div>
+              <div className="text-slate-300 mb-5 text-sm leading-relaxed">{error}</div>
+              <button
+                onClick={retry}
+                className="w-full rounded-2xl bg-rose-500/90 hover:bg-rose-500 text-white font-black py-3 shadow-lg active:scale-[0.98] transition-all"
+              >
+                Retry Connection
+              </button>
             </div>
-            <div className="text-gray-400">Room ID: {hostId}</div>
-          </div>
-        )}
-        <div className="mt-12 w-full max-w-sm">
-          <div className="bg-gray-800/80 p-4 rounded-xl border border-gray-700/50 text-center shadow-lg">
-            <div className="text-gray-300 font-bold mb-2">Want to look around without a host?</div>
-            <p className="text-xs text-gray-400 mb-4">
-              Explore the Client interface, test gestures, and organize a mock hand offline.
-            </p>
-            <button
-              onClick={() => setSearchParams((prev) => { prev.set('preview', 'true'); return prev; })}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded shadow active:scale-95 transition-all"
-            >
-              Enter UI Preview Mode
-            </button>
-          </div>
+          ) : (
+            <div className="text-center">
+              <div className="text-slate-100 text-2xl font-black mb-2">
+                {status === 'retrying'
+                  ? 'Retrying…'
+                  : status === 'reconnecting'
+                    ? 'Reconnecting…'
+                    : 'Connecting to Host…'}
+              </div>
+              <div className="text-slate-400 text-sm">Room ID: {hostId}</div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 w-full max-w-sm rounded-[1.5rem] border border-cyan-400/20 bg-cyan-500/10 p-4 text-center">
+          <div className="text-cyan-300 font-black text-sm uppercase tracking-[0.2em] mb-1">Preview Mode</div>
+          <p className="text-xs text-cyan-100/80 mb-3">Open the client hand UI offline to test taps and swipes.</p>
+          <button
+            onClick={() => setSearchParams(prev => {
+              const next = new URLSearchParams(prev);
+              next.set('preview', 'true');
+              return next;
+            })}
+            className="w-full rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-3 shadow-lg active:scale-[0.98] transition-all"
+          >
+            Enter UI Preview
+          </button>
         </div>
       </div>
     );
   }
 
-  // Draw From Other Mode
   const targetPlayer = viewOther && activeGameState ? activeGameState.players[viewOther] : null;
 
   if (viewOther && targetPlayer) {
-
     return (
-      <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col">
-        <div className="flex items-center mb-6">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#020617_70%)] text-white p-4 flex flex-col">
+        <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => {
               setViewOther(null);
               setStolenCardResult(null);
             }}
-            className="text-blue-400 font-bold flex items-center gap-1 bg-gray-800 px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-black text-sky-300 active:scale-[0.98] transition-all"
           >
             ← Back
           </button>
-          <div className="flex-1 text-center font-bold text-lg mr-12 text-gray-300">
-            Inspection Mode
-          </div>
+          <div className="text-xs font-black uppercase tracking-[0.25em] text-white/45">Inspect Hand</div>
+          <div className="w-16" />
         </div>
 
         {stolenCardResult ? (
-          <div className="flex-1 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
-            <h2 className="text-3xl font-black text-green-400 mb-2">Blind Steal Successful!</h2>
-            <p className="text-gray-300 mb-8 text-center px-4">
-              You randomly selected this card from {targetPlayer.name}'s hand.<br/>
-              <span className="text-yellow-400 font-bold">It has been added to your hand.</span>
+          <div className="flex-1 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300">
+            <div className="text-3xl font-black text-emerald-400 mb-2">Card taken</div>
+            <p className="text-slate-300 mb-6 max-w-xs">
+              You randomly pulled this card from {targetPlayer.name}&apos;s hidden hand.
             </p>
-            <div className="w-48 mb-10 transform scale-125">
-              {renderCard(stolenCardResult, -1)}
-            </div>
+            <div className="w-48 mb-8">{renderCard(stolenCardResult, 0, 1)}</div>
             <button
               onClick={() => {
                 const stolenId = stolenCardResult.id;
                 setStolenCardResult(null);
                 setViewOther(null);
-                // Manually trigger the visual feedback for returning from steal
                 setRecentlyDrawnCardIds(prev => [...prev, stolenId]);
                 setToastMessage('+1 Card Stolen');
-                setTimeout(() => {
+                window.setTimeout(() => {
                   setRecentlyDrawnCardIds(prev => prev.filter(id => id !== stolenId));
                   setToastMessage(null);
-                }, 2500);
+                }, 2200);
               }}
-              className="bg-green-600 hover:bg-green-500 text-white font-black text-xl py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.4)] active:scale-95 transition-all w-full max-w-xs"
+              className="w-full max-w-sm rounded-2xl bg-emerald-500 text-slate-950 font-black py-4 shadow-[0_0_24px_rgba(16,185,129,0.35)] active:scale-[0.98] transition-all"
             >
-              BACK TO HAND
+              Back to Hand
             </button>
           </div>
         ) : (
           <>
-            <div className="bg-blue-900/40 border border-blue-500/50 rounded-xl p-4 mb-8 text-center">
-              <h2 className="text-2xl font-black text-white mb-2">{targetPlayer.name}'s Hidden Hand</h2>
-              <p className="text-sm text-blue-200">
-                You cannot see the card faces (Blind Draw).<br/>
-                <span className="font-bold text-yellow-400">Tap a card back to randomly steal it!</span>
-              </p>
+            <div className="rounded-[1.5rem] border border-sky-400/20 bg-sky-500/10 p-4 mb-5 text-center">
+              <div className="text-xl font-black text-white">{targetPlayer.name}&apos;s Hidden Hand</div>
+              <div className="text-sm text-sky-100/80 mt-1">Tap a card back to randomly steal it.</div>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 flex-grow content-start">
-          {Array.from({ length: targetPlayer.handCount }).map((_, i) => (
-            <div
-              key={i}
-              onClick={() => {
-                if (navigator.vibrate) {
-                  navigator.vibrate(15);
-                }
-                playDrawSound();
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 content-start">
+              {Array.from({ length: targetPlayer.handCount }).map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    if (navigator.vibrate) navigator.vibrate(15);
+                    playDrawSound();
 
-                if (isPreview) {
-                  const newCard: Card = { id: `mock-stolen-${Date.now()}`, suit: 'none', rank: 'JOKER' };
-                  setLocalHand(prev => [...prev, newCard]);
-                  setLocalGameState(prev => {
-                    const newPlayers = { ...prev.players };
-                    if (newPlayers[viewOther]) {
-                      newPlayers[viewOther] = { ...newPlayers[viewOther], handCount: Math.max(0, newPlayers[viewOther].handCount - 1) };
+                    if (isPreview) {
+                      const newCard: Card = { id: `mock-stolen-${Date.now()}`, suit: 'none', rank: 'JOKER' };
+                      setLocalHand(prev => [...prev, newCard]);
+                      setLocalGameState(prev => {
+                        const nextPlayers = { ...prev.players };
+                        if (nextPlayers[viewOther]) {
+                          nextPlayers[viewOther] = {
+                            ...nextPlayers[viewOther],
+                            handCount: Math.max(0, nextPlayers[viewOther].handCount - 1),
+                          };
+                        }
+                        return { ...prev, players: nextPlayers };
+                      });
+                      setStolenCardResult(newCard);
+                    } else {
+                      drawFromOther(viewOther, '');
+                      setViewOther(null);
                     }
-                    return { ...prev, players: newPlayers };
-                  });
-                  setStolenCardResult(newCard);
-                } else {
-                  // In a real app we'd need to know the hidden card ID,
-                  // but since we only have count on client, we need a way for host to pick random.
-                  // For simplicity in this demo, since client doesn't have IDs of other's cards,
-                  // let's pass an empty string and let Host pick a random one if ID is empty.
-                  drawFromOther(viewOther, '');
-                  setViewOther(null);
-                }
-              }}
-              className="group relative aspect-[2/3] bg-blue-800 rounded-lg border-2 border-white/20 flex items-center justify-center cursor-pointer hover:bg-blue-600 hover:border-yellow-400 hover:-translate-y-1 transition-all shadow-md overflow-hidden"
-            >
-              <div className="flex flex-col items-center justify-center pointer-events-none">
-                <div className="text-white/30 font-black text-3xl mb-1">?</div>
-                <div className="text-yellow-400 font-bold text-[10px] uppercase tracking-wider bg-black/40 px-2 py-0.5 rounded">Tap to Draw</div>
-              </div>
+                  }}
+                  className="group relative aspect-[2/3] rounded-[1.1rem] border border-white/10 bg-[linear-gradient(135deg,_rgba(30,64,175,0.9),_rgba(15,23,42,0.95))] shadow-[0_16px_36px_rgba(0,0,0,0.35)] overflow-hidden active:scale-[0.98] transition-all"
+                >
+                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top,_white_0%,_transparent_55%)]" />
+                  <div className="relative h-full flex flex-col items-center justify-center">
+                    <div className="text-white/30 text-4xl font-black mb-1">?</div>
+                    <div className="rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">Tap to Draw</div>
+                  </div>
+                </button>
+              ))}
+              {targetPlayer.handCount === 0 && (
+                <div className="col-span-3 sm:col-span-4 text-center text-slate-500 mt-10">No cards in hand to steal.</div>
+              )}
             </div>
-          ))}
-          {targetPlayer.handCount === 0 && (
-            <div className="col-span-3 sm:col-span-4 text-center text-gray-500 mt-10">
-              No cards in hand to steal.
-            </div>
-          )}
-        </div>
           </>
         )}
       </div>
     );
   }
 
+  const totalStackCards = activeGameState?.playStack.reduce((acc, batch) => acc + batch.length, 0) ?? 0;
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#1e293b_0%,_#020617_60%)] text-white relative overflow-hidden">
       {toastMessage && (
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="bg-green-500 text-white px-6 py-3 rounded-full font-black text-xl shadow-[0_0_30px_rgba(34,197,94,0.5)] border-2 border-green-300 whitespace-nowrap">
+        <div className="pointer-events-none absolute top-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="rounded-full border border-emerald-300/40 bg-emerald-500 px-5 py-2.5 text-sm font-black text-white shadow-[0_0_30px_rgba(34,197,94,0.45)] whitespace-nowrap">
             {toastMessage}
           </div>
         </div>
       )}
+
       {isPreview && (
-        <div className="bg-purple-900/40 border-2 border-purple-500 border-dashed rounded-lg p-3 mb-4 flex justify-between items-center shadow-lg">
-          <div className="flex flex-col">
-            <span className="text-purple-300 font-bold text-sm">Preview Harness</span>
-            <span className="text-purple-400/80 text-xs">Test dark-card interactions</span>
-          </div>
-          <button
-            onClick={() => setViewOther('mock-peer-1')}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 px-4 rounded shadow transition-colors active:scale-95 text-sm"
-          >
-            Inspect Alice
-          </button>
+        <div className="absolute top-4 right-4 z-40 rounded-full border border-violet-300/20 bg-violet-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.24em] text-violet-200 backdrop-blur">
+          Preview
         </div>
       )}
 
-      {/* Read-Only Table Info Banner */}
       {activeGameState && (
-        <div className="flex justify-between items-center bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-          <div>{DEFAULT_SANDBOX_PACK.containers.deck.shortLabel}: <span className="text-white">{activeGameState.deckCount}</span></div>
-          <div className="flex items-center gap-1">
-            {DEFAULT_SANDBOX_PACK.containers.discardPile.shortLabel}: <span className="text-white">{activeGameState.discardPile.length}</span>
-            {activeGameState.discardPile.length > 0 && (
-              <span className={`px-1 py-0.5 rounded ml-1 bg-white leading-none flex items-center ${activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'hearts' || activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'diamonds' ? 'text-red-600' : 'text-black'}`}>
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].rank}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'hearts' && '♥'}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'diamonds' && '♦'}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'clubs' && '♣'}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'spades' && '♠'}
-                {activeGameState.discardPile[activeGameState.discardPile.length - 1].suit === 'none' && '🃏'}
-              </span>
-            )}
+        <div className="sticky top-0 z-30 border-b border-white/5 bg-slate-950/55 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-slate-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(34,197,94,0.7)]" />
+              {status === 'connected' ? 'Live' : 'Syncing'}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-slate-300">
+              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                Deck <span className="text-white">{activeGameState.deckCount}</span>
+              </div>
+              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                Discard <span className="text-white">{activeGameState.discardPile.length}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Top Play Zone Indicator */}
-      <div
-        className="min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center mb-4 bg-gray-800/50 cursor-pointer px-3 py-3"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleSwipeUpPlay}
-      >
-        <span className="text-gray-500 font-bold uppercase tracking-widest text-center text-sm pointer-events-none mb-1">
-          ↑ SWIPE UP TO PLAY
-        </span>
-        <span className="text-gray-600 text-xs text-center pointer-events-none">
-          Drag selected cards upward
-        </span>
-      </div>
+      <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-3xl flex-col px-4 pb-4 pt-4">
+        {activeGameState && (
+          <div className="mb-4 rounded-[1.5rem] border border-white/8 bg-white/5 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/45">Play Stack</div>
+                <div className="text-sm text-white/70">{totalStackCards} cards on the table</div>
+              </div>
+              {latestPlayBatch && activeGameState.playStack.length > 0 && (
+                <button
+                  onClick={handleTakeBack}
+                  className="rounded-full border border-amber-300/20 bg-amber-400/15 px-3 py-1.5 text-xs font-black text-amber-200 active:scale-[0.98] transition-all"
+                >
+                  Undo last play
+                </button>
+              )}
+            </div>
 
-      {activeGameState && activeGameState.playStack.length > 0 && (
-        <div className="mb-4 flex flex-col gap-2">
-          {activeGameState.playStack.slice(-2).reverse().map((batch, idx) => {
-            const isTopBatch = idx === 0;
-            return (
-              <div key={idx} className={`bg-gray-800 rounded-xl p-3 border border-gray-700 flex flex-col ${isTopBatch ? '' : 'opacity-50 grayscale-[50%]'}`}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className={`text-xs font-bold uppercase tracking-wider ${isTopBatch ? 'text-yellow-500' : 'text-gray-500'}`}>
-                    {isTopBatch ? 'Latest Play (Top of Stack)' : 'Previous Play'}
-                  </span>
-                  {isTopBatch && (
-                    <button
-                      onClick={handleTakeBack}
-                      className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm transition-colors active:scale-95 shadow-md"
-                    >
-                      TAKE BACK (Undo)
-                    </button>
-                  )}
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {batch.map((card: Card) => {
-                    const color = card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-red-600' : 'text-black';
+            <div className="relative flex min-h-40 items-center justify-center overflow-hidden rounded-[1.25rem] border border-dashed border-white/8 bg-slate-950/35 p-4">
+              {activeGameState.playStack.length > 0 ? (
+                <div className="relative h-36 w-56">
+                  {activeGameState.playStack.slice(-3).map((batch, batchIndex) => {
+                    const isTopBatch = batchIndex === activeGameState.playStack.slice(-3).length - 1;
+                    const offset = batchIndex * 10;
                     return (
-                      <div key={card.id} className="w-12 h-16 bg-white rounded shadow flex flex-col justify-between p-1 flex-shrink-0">
-                        <div className={`text-xs font-bold leading-none ${color}`}>{card.rank}</div>
-                        <div className={`text-lg self-center leading-none ${color}`}>
-                          {card.suit === 'hearts' && '♥'}
-                          {card.suit === 'diamonds' && '♦'}
-                          {card.suit === 'clubs' && '♣'}
-                          {card.suit === 'spades' && '♠'}
-                          {card.suit === 'none' && '🃏'}
+                      <div
+                        key={`${batchIndex}-${batch[0]?.id ?? 'batch'}`}
+                        className={`absolute inset-0 rounded-[1.25rem] border ${isTopBatch ? 'border-amber-300/50 bg-amber-400/10' : 'border-white/8 bg-white/5'} shadow-2xl`}
+                        style={{
+                          transform: `translate(${offset}px, ${-offset}px) rotate(${(batchIndex - 1) * 4}deg)`,
+                        }}
+                      >
+                        <div className="flex h-full items-center justify-center gap-2 overflow-hidden rounded-[1.25rem] p-3">
+                          {batch.map(renderMiniCard)}
                         </div>
+                        {isTopBatch && (
+                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.24em] text-slate-950 shadow-lg">
+                            Latest
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Hand Area */}
-      <div className="flex-grow flex flex-col">
-        <div className="mb-2">
-          <h2 className="text-lg font-bold flex justify-between items-center mb-2">
-            <span>Your Hand ({hand.length})</span>
-            {selectedCards.length > 0 ? (
-              <div className="flex items-center">
-                <button
-                   onClick={() => setSelectedCards([])}
-                   className="text-sm text-blue-400 bg-gray-800 px-3 py-1 rounded"
-                >
-                   Clear Selection
-                </button>
-                <span className="text-xs text-yellow-400 font-bold animate-pulse ml-2">↓ CHOOSE ACTION BELOW ↓</span>
-              </div>
-            ) : (
-              <span className="text-xs text-gray-500 font-normal">Tap cards to select &amp; act</span>
-            )}
-          </h2>
-          <div className="flex gap-2">
-            <span className="text-xs text-gray-400 self-center uppercase tracking-wider font-bold">Sort (Local Only):</span>
-            <button
-              onClick={() => setSortMode('draw')}
-              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'draw' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              TIME
-            </button>
-            <button
-              onClick={() => setSortMode('suit')}
-              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'suit' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              SUIT
-            </button>
-            <button
-              onClick={() => setSortMode('rank')}
-              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'rank' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              RANK
-            </button>
-            <button
-              onClick={() => setSortMode('free')}
-              className={`text-xs px-2 py-1 rounded font-bold transition-colors ${sortMode === 'free' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              FREE
-            </button>
+              ) : (
+                <div className="text-center text-white/35">
+                  <div className="text-lg font-black uppercase tracking-[0.3em]">Empty Stack</div>
+                  <div className="mt-2 text-xs text-white/25">{DEFAULT_SANDBOX_PACK.containers.playStack.emptyText}</div>
+                </div>
+              )}
+            </div>
           </div>
-          {sortMode === 'free' && (
-            <div className="text-[10px] text-gray-400 mt-1.5 italic">
-              Long press and drag cards to rearrange your hand.
+        )}
+
+        {activeGameState && Object.keys(activeGameState.players).length > 1 && (
+          <div className="mb-4 rounded-[1.5rem] border border-white/8 bg-white/5 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+            <div className="mb-3 text-[10px] font-black uppercase tracking-[0.3em] text-white/45">Other Hands</div>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {Object.values(activeGameState.players)
+                .filter(player => player.id !== peerId)
+                .map(player => (
+                  <button
+                    key={player.id}
+                    type="button"
+                    onClick={() => setViewOther(player.id)}
+                    className="w-32 flex-shrink-0 rounded-[1.2rem] border border-white/8 bg-slate-950/60 p-3 text-left shadow-lg active:scale-[0.98] transition-all"
+                  >
+                    <div className="text-sm font-black text-white truncate">{player.name}</div>
+                    <div className="mt-1 text-xs text-slate-400">{player.handCount} cards</div>
+                    <div className="mt-3 text-[10px] font-black uppercase tracking-[0.24em] text-sky-300">Peek & draw</div>
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
+
+        <div
+          className="mb-4 rounded-[1.75rem] border border-white/8 bg-[linear-gradient(180deg,_rgba(255,255,255,0.07),_rgba(255,255,255,0.03))] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleHandGestureEnd}
+        >
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/45">Your Hand</div>
+              <div className="text-sm text-white/70">Tap cards to select. Swipe up to play.</div>
+            </div>
+            <div className="rounded-full border border-white/8 bg-slate-950/40 px-3 py-1.5 text-xs font-black text-white/85">
+              {hand.length} cards
+            </div>
+          </div>
+
+          <div className="overflow-x-auto pb-2">
+            <div className="flex items-end gap-0 px-1 py-3">
+              {displayHand.map((card, index) => (
+                <div key={card.id} className="-ml-8 first:ml-0 first:pl-0" style={{ zIndex: index + 1 }}>
+                  {renderCard(card, index, displayHand.length)}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {hand.length === 0 && (
+            <div className="rounded-[1.25rem] border border-dashed border-white/8 bg-slate-950/35 px-4 py-10 text-center text-white/35">
+              No cards in hand. Swipe down to draw.
             </div>
           )}
         </div>
 
-        <div className="flex-grow overflow-y-auto pr-2 pb-4 pt-12 px-4">
-          {sortMode === 'draw' || sortMode === 'free' ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              {displayHand.map((card, idx) => renderCard(card, idx))}
+        <div
+          className={`mt-auto rounded-[1.75rem] border ${selectedCards.length > 0 ? 'border-amber-300/25 bg-amber-400/10' : 'border-cyan-300/15 bg-cyan-500/8'} p-4 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl`}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleActionDockGestureEnd}
+        >
+          {selectedCards.length > 0 ? (
+            <div className="text-center">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-200/80">
+                {selectedCards.length} selected
+              </div>
+              <div className="mt-2 text-sm text-amber-50/90">Swipe up to play, left for deck top, right for deck bottom.</div>
+              <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-100/80">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">← Top</span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">↑ Play</span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Bottom →</span>
+              </div>
             </div>
           ) : (
-            groupedHand && Object.entries(groupedHand).map(([groupName, cards]) => (
-              <div key={groupName} className="mb-6">
-                <div className="text-xs font-bold text-gray-500 mb-2 border-b border-gray-700 pb-1 uppercase tracking-wider">
-                  {groupName} ({cards.length})
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {cards.map((card, idx) => renderCard(card, idx))}
-                </div>
-              </div>
-            ))
-          )}
-          {hand.length === 0 && (
-            <div className="h-full flex items-center justify-center text-gray-500 mt-10">
-              No cards in hand. Swipe down to draw!
+            <div className="text-center">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-200/70">Gesture Dock</div>
+              <div className="mt-2 text-sm text-cyan-50/80">Swipe down here to draw a card.</div>
+              <div className="mt-3 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/60">Tap cards to build a play, then swipe.</div>
             </div>
           )}
-          {/* Spacer inside scroll container for action bar */}
-          {selectedCards.length > 0 && <div className="h-48 flex-shrink-0" />}
-
         </div>
-      </div>
-
-      {/* Bottom Draw/Return Zone Indicator */}
-      <div
-        className="mt-4 min-h-20 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-3 py-3"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={(e) => handleSwipeDownDrawReturn(e)}
-      >
-        <span className="text-blue-400 font-black text-xl mb-2 pointer-events-none">
-          ↓ SWIPE DOWN TO DRAW
-        </span>
-        <button
-          onClick={handleDrawAction}
-          disabled={isDrawing}
-          className={`px-4 py-1 text-xs transition-all pointer-events-auto flex items-center justify-center gap-2 underline ${
-            isDrawing ? 'text-gray-500 cursor-wait' : 'text-gray-500 hover:text-white active:scale-95'
-          }`}
-        >
-          {isDrawing ? <span>(drawing...)</span> : <span>(or tap to draw)</span>}
-        </button>
       </div>
 
       {selectedCards.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 border-t-2 border-yellow-400 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 flex flex-col gap-3 pb-safe">
-          <div className="text-yellow-400 text-xs font-bold uppercase tracking-wider text-center -mb-1 animate-pulse">
-            <span>↓ Actions for {selectedCards.length} selected card{selectedCards.length > 1 ? 's' : ''} ↓</span>
-          </div>
-          <div
-            className="w-full border-2 border-green-500 rounded-xl flex flex-col items-center justify-center bg-green-900/40 shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-pointer px-3 py-3"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleSwipeUpPlay}
-          >
-            <span className="text-green-400 font-black text-xl mb-2 pointer-events-none">
-              ↑ SWIPE UP TO PLAY
-            </span>
-            <button
-              onClick={handlePlaySelected}
-              className="px-4 py-1 text-xs transition-all pointer-events-auto flex items-center justify-center gap-2 underline text-gray-400 hover:text-white active:scale-95"
-            >
-              <span>(or tap to play)</span>
-            </button>
-          </div>
-
-          <div className="w-full text-center">
-             <span className="text-blue-400 font-black text-xl mb-2 pointer-events-none">
-               ↓ SWIPE DOWN TO RETURN
-             </span>
-          </div>
-
-          <div className="flex gap-2 w-full">
-            <div
-              className="flex-1 border border-blue-600 rounded-xl flex flex-col items-center justify-center bg-blue-900/30 cursor-pointer px-2 py-2"
-              onTouchStart={handleTouchStart}
-              onTouchEnd={(e) => handleSwipeDownDrawReturn(e, true)}
-            >
-              <span className="text-blue-400 font-bold text-sm mb-1 pointer-events-none">TO DECK TOP</span>
-              <button
-                onClick={() => handleReturnSelected(true)}
-                className="w-full px-2 py-1 text-xs transition-all pointer-events-auto flex flex-col items-center underline text-gray-400 hover:text-white active:scale-95"
-              >
-                <span>(or tap to return to top)</span>
-              </button>
-            </div>
-            <div
-              className="flex-1 border border-gray-500 rounded-xl flex flex-col items-center justify-center bg-gray-800/50 cursor-pointer px-2 py-2"
-              onTouchStart={handleTouchStart}
-              onTouchEnd={(e) => handleSwipeDownDrawReturn(e, false)}
-            >
-               <span className="text-gray-400 font-bold text-sm mb-1 pointer-events-none">TO DECK BOTTOM</span>
-               <button
-                onClick={() => handleReturnSelected(false)}
-                className="w-full px-2 py-1 text-xs transition-all pointer-events-auto flex flex-col items-center underline text-gray-400 hover:text-white active:scale-95"
-              >
-                <span>(or tap to return to bottom)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-
-      {/* Other Players Area */}
-      {activeGameState && Object.keys(activeGameState.players).length > 1 && (
-        <div className="mt-4 pt-4 border-t border-gray-800">
-          <h2 className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Other Players (Peek & Draw)</h2>
-          <div className="flex overflow-x-auto gap-3 pb-2">
-            {Object.values(activeGameState.players).map(p => {
-              if (p.id === peerId) return null;
-
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setViewOther(p.id)}
-                  className="flex-shrink-0 text-left bg-gray-800 border border-gray-700 rounded-lg p-3 w-32 cursor-pointer hover:bg-gray-700 hover:border-blue-500 active:scale-95 transition-all flex flex-col justify-between group"
-                >
-                  <div>
-                    <div className="font-bold truncate text-sm text-white group-hover:text-blue-400 transition-colors">{p.name}</div>
-                    <div className="text-xs text-gray-400 mt-1">{p.handCount} cards</div>
-                  </div>
-                  <div className="text-xs text-blue-500 mt-2 font-semibold uppercase tracking-widest opacity-80 group-hover:opacity-100 flex items-center gap-1">
-                    <span>👁 Peek & Draw</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        <div className="pointer-events-none fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-[1.5rem] border border-white/8 bg-slate-950/70 px-4 py-3 text-center shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+          <div className="text-xs font-black uppercase tracking-[0.3em] text-white/45">Selection ready</div>
+          <div className="mt-1 text-sm text-white/75">Gesture dock handles play and return. Tap a selected card to deselect.</div>
         </div>
       )}
     </div>
