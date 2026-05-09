@@ -19,6 +19,8 @@ export function useHost() {
     playStack: [],
     players: {},
   });
+  const gameStateRef = useRef(gameState);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
   const retry = () => {
     setStatus('starting');
@@ -173,40 +175,48 @@ export function useHost() {
       }
       case 'TAKE_BACK': {
         const { cards } = action.payload;
+        const takenIds = cards.map(c => c.id);
 
-        // We need to pop from playStack
-        updateStateAndBroadcast(prev => {
-          const newPlayStack = [...prev.playStack];
-          // We assume taking back from top of playStack for simplicity
-          // Finding the exact cards and removing them from stack
-          const lastBatch = newPlayStack.pop() || [];
+        // Read current playStack from the ref (up-to-date snap before mutating)
+        const snapPlayStack = gameStateRef.current.playStack;
+        const newPlayStack = [...snapPlayStack];
+        const lastBatch = newPlayStack.pop() || [];
 
-          const takenIds = cards.map(c => c.id);
+        // Only take back cards that are actually in the popped batch.
+        // This guards against stale/duplicate TAKE_BACK actions (e.g.
+        // double-click) that arrive after the batch was already processed.
+        const validCards = cards.filter(c => lastBatch.some(lc => lc.id === c.id));
+
+        if (validCards.length === 0) {
+          // Stale TAKE_BACK — put the batch back and ignore
+          if (lastBatch.length > 0) {
+            newPlayStack.push(lastBatch);
+          }
+        } else {
+          // Side effects (outside setGameState updater, safe from strict-mode double call)
+          serverStateRef.current.playerHands[clientId].push(...validCards);
+          const msg: HostMessage = { type: 'RECEIVE_CARDS', payload: validCards };
+          connectionsRef.current[clientId]?.send(msg);
+
+          // Put back any cards from the batch that weren't requested
           const remainingBatch = lastBatch.filter(c => !takenIds.includes(c.id));
-
           if (remainingBatch.length > 0) {
             newPlayStack.push(remainingBatch);
           }
+        }
 
-          // Add to player hand server side
-          serverStateRef.current.playerHands[clientId].push(...cards);
-
-          // Send cards back to player
-          const msg: HostMessage = { type: 'RECEIVE_CARDS', payload: cards };
-          connectionsRef.current[clientId]?.send(msg);
-
-          return {
-            ...prev,
-            playStack: newPlayStack,
-            players: {
-              ...prev.players,
-              [clientId]: {
-                ...prev.players[clientId],
-                handCount: serverStateRef.current.playerHands[clientId].length
-              }
+        // Pure state update + broadcast (no side effects inside)
+        updateStateAndBroadcast(prev => ({
+          ...prev,
+          playStack: newPlayStack,
+          players: {
+            ...prev.players,
+            [clientId]: {
+              ...prev.players[clientId],
+              handCount: serverStateRef.current.playerHands[clientId].length
             }
-          };
-        });
+          }
+        }));
         break;
       }
       case 'DRAW_FROM_OTHER': {
@@ -323,6 +333,16 @@ export function useHost() {
       }));
     };
 
+    const handleHostDealToTable = (e: Event) => {
+      const customEvent = e as CustomEvent<{ cardData: Card }>;
+      const { cardData } = customEvent.detail;
+
+      updateStateAndBroadcast(prev => ({
+        ...prev,
+        playStack: [...prev.playStack, [cardData]]
+      }));
+    };
+
     const handleHostReturnBatch = (e: Event) => {
       const customEvent = e as CustomEvent<{ toTop: boolean }>;
       const { toTop } = customEvent.detail;
@@ -398,8 +418,22 @@ export function useHost() {
     window.addEventListener('host-draw-to-table', handleHostDrawToTable);
     window.addEventListener('host-return-batch', handleHostReturnBatch);
     window.addEventListener('host-clear-table', handleHostClearTable);
+    window.addEventListener('host-deal-to-table', handleHostDealToTable);
     window.addEventListener('host-drag-public-card', handleHostDragPublicCard);
     window.addEventListener('host-return-public-card', handleHostReturnPublicCard);
+
+    const handleHostDiscardCard = (e: Event) => {
+      const customEvent = e as CustomEvent<{ cardData: Card }>;
+      const { cardData } = customEvent.detail;
+
+      updateStateAndBroadcast(prev => ({
+        ...prev,
+        discardPile: [...prev.discardPile, cardData]
+      }));
+    };
+
+    window.addEventListener('host-discard-card', handleHostDiscardCard);
+
     return () => {
       window.removeEventListener('host-deal-card', handleHostDeal);
       window.removeEventListener('host-pop-card', handleHostPopCard);
@@ -407,8 +441,10 @@ export function useHost() {
       window.removeEventListener('host-draw-to-table', handleHostDrawToTable);
       window.removeEventListener('host-return-batch', handleHostReturnBatch);
       window.removeEventListener('host-clear-table', handleHostClearTable);
+      window.removeEventListener('host-deal-to-table', handleHostDealToTable);
       window.removeEventListener('host-drag-public-card', handleHostDragPublicCard);
       window.removeEventListener('host-return-public-card', handleHostReturnPublicCard);
+      window.removeEventListener('host-discard-card', handleHostDiscardCard);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

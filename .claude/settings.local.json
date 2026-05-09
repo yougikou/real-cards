@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xxd)",
+      "Bash(npx tsc *)",
+      "Bash(npx -p typescript tsc --noEmit)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(npm ci *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "Bash(npx eslint *)",
+      "Bash(sed -z 's/          <\\\\/div>\\\\n\\\\n\\\\n\\\\t        <\\\\/div>/          <\\\\/div>\\\\n\\\\n\\\\t        <\\\\/div>/' src/pages/Host.tsx -i)",
+      "Bash(head -n 360 src/pages/Host.tsx)",
+      "Bash(echo '')",
+      "Bash(tail -n +363 src/pages/Host.tsx)",
+      "Bash(mv temp.tsx src/pages/Host.tsx)",
+      "Bash(npx vite *)",
+      "Bash(node *)",
+      "Bash(git stash *)"
+    ]
+  }
+}

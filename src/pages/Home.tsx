@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useLocale, t } from '../i18n/LocaleProvider';
+import dict from '../i18n/translations';
+import type { Locale } from '../i18n/LocaleProvider';
+
+const LOCALES: { code: Locale; label: string }[] = [
+  { code: 'zh', label: '中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'en', label: 'English' },
+];
 
 export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { locale, setLocale } = useLocale();
   const message = (location.state as { message?: string })?.message;
 
   useEffect(() => {
@@ -35,34 +45,34 @@ export default function Home() {
         </div>
       )}
 
-      <h1 className="text-4xl font-bold mb-8">Real Cards Sandbox</h1>
+      <h1 className="text-4xl font-bold mb-8">{t(locale, dict, 'app.title')}</h1>
 
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4 text-center">Host a Game</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-center">{t(locale, dict, 'home.hostGame')}</h2>
           <button
             onClick={handleCreateRoom}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded transition-colors"
           >
-            Create Table (Tablet)
+            {t(locale, dict, 'home.createTable')}
           </button>
         </div>
 
         <div className="relative flex py-5 items-center">
           <div className="flex-grow border-t border-gray-300"></div>
-          <span className="flex-shrink-0 mx-4 text-gray-400">OR</span>
+          <span className="flex-shrink-0 mx-4 text-gray-400">{t(locale, dict, 'home.or')}</span>
           <div className="flex-grow border-t border-gray-300"></div>
         </div>
 
         <div>
-          <h2 className="text-2xl font-semibold mb-4 text-center">Join a Game</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-center">{t(locale, dict, 'home.joinGame')}</h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t(locale, dict, 'home.yourName')}</label>
               <input
                 type="text"
-                placeholder="Enter your name"
+                placeholder={t(locale, dict, 'home.yourName')}
                 className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
@@ -70,10 +80,10 @@ export default function Home() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Room Code</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t(locale, dict, 'home.roomCode')}</label>
               <input
                 type="text"
-                placeholder="Scan QR or enter code"
+                placeholder={t(locale, dict, 'home.roomCodeHint')}
                 className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
@@ -89,23 +99,39 @@ export default function Home() {
                   : 'bg-green-600 hover:bg-green-700 text-white'
               }`}
             >
-              Join (Phone)
+              {t(locale, dict, 'home.join')}
             </button>
           </div>
         </div>
 
         <div className="mt-8 pt-6 border-t border-gray-200">
-          <h2 className="text-xl font-semibold mb-4 text-center text-gray-700">Explore UI</h2>
+          <h2 className="text-xl font-semibold mb-4 text-center text-gray-700">{t(locale, dict, 'home.explore')}</h2>
           <Link
             to="/client/preview_room?name=Previewer&preview=true"
             className="block text-center w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded transition-colors shadow-sm"
           >
-            Try Client Preview Mode
+            {t(locale, dict, 'home.preview')}
           </Link>
           <p className="text-xs text-gray-500 text-center mt-2">
-            Test the hand UI locally without needing a Host connection.
+            {t(locale, dict, 'home.previewHint')}
           </p>
         </div>
+      </div>
+
+      <div className="mt-6 flex items-center gap-2">
+        {LOCALES.map(({ code, label }) => (
+          <button
+            key={code}
+            onClick={() => setLocale(code)}
+            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+              locale === code
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );

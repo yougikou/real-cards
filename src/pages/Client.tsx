@@ -5,7 +5,15 @@ import type { Card, GameState, Suit } from '../types';
 import { playCardSound } from '../utils/audio/playCard';
 import { playDrawSound } from '../utils/audio/draw';
 import { playReturnSound } from '../utils/audio/returnCard';
-import { DEFAULT_SANDBOX_PACK } from '../config/tableConfig';
+import { useLocale, t } from '../i18n/LocaleProvider';
+import dict from '../i18n/translations';
+import type { Locale } from '../i18n/LocaleProvider';
+
+const LOCALES: { code: Locale; label: string }[] = [
+  { code: 'zh', label: '中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'en', label: 'English' },
+];
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
   hearts: '♥',
@@ -49,15 +57,12 @@ function cardTone(card: Card) {
   return isRedSuit(card.suit) ? 'text-red-600' : 'text-slate-900';
 }
 
-function deckCardTone(card: Card) {
-  return isRedSuit(card.suit) ? 'text-red-500' : 'text-slate-900';
-}
-
 export default function Client() {
   const { hostId } = useParams<{ hostId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const playerName = searchParams.get('name') || 'Player';
   const isPreview = searchParams.get('preview') === 'true';
+  const { locale, setLocale } = useLocale();
 
   const {
     status: realStatus,
@@ -82,6 +87,7 @@ export default function Client() {
   const [recentlyDrawnCardIds, setRecentlyDrawnCardIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isUndoingRef = useRef(false);
 
   const status = isPreview ? 'connected' : realStatus;
   const hand = isPreview ? localHand : realHand;
@@ -104,7 +110,7 @@ export default function Client() {
     if (newCards.length > 0 && !viewOther) {
       const newCardIds = newCards.map(card => card.id);
       setRecentlyDrawnCardIds(prev => [...prev, ...newCardIds]);
-      setToastMessage(`+${newCards.length} Card${newCards.length > 1 ? 's' : ''}`);
+      setToastMessage(t(locale, dict, 'client.plusCards', { n: String(newCards.length) }));
       window.setTimeout(() => {
         setRecentlyDrawnCardIds(prev => prev.filter(id => !newCardIds.includes(id)));
         setToastMessage(null);
@@ -112,7 +118,7 @@ export default function Client() {
     }
 
     previousHandRef.current = hand;
-  }, [hand, viewOther]);
+  }, [hand, viewOther, locale]);
 
   const displayHand = useMemo(() => hand, [hand]);
   const latestPlayBatch = useMemo(() => activeGameState?.playStack[activeGameState.playStack.length - 1] ?? null, [activeGameState]);
@@ -135,9 +141,9 @@ export default function Client() {
         const newCard: Card = { id: `mock-drawn-${Date.now()}`, suit: 'spades', rank: '7' };
         setLocalHand(prev => [...prev, newCard]);
         setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount - 1 }));
-        showToast('Drawn from deck');
+        showToast(t(locale, dict, 'client.drawnToast'));
       } else {
-        showToast('Deck is empty');
+        showToast(t(locale, dict, 'client.deckEmpty'));
       }
     } else {
       drawCard(1);
@@ -157,7 +163,7 @@ export default function Client() {
         ...prev,
         playStack: [...prev.playStack, cardsToPlay],
       }));
-      showToast(`Played ${cardsToPlay.length} card${cardsToPlay.length > 1 ? 's' : ''}`);
+      showToast(t(locale, dict, 'client.played', { n: String(cardsToPlay.length) }));
     } else {
       playCards(cardsToPlay);
     }
@@ -178,7 +184,7 @@ export default function Client() {
         ...prev,
         deckCount: prev.deckCount + cardsToReturn.length,
       }));
-      showToast(`Returned to deck ${toTop ? 'top' : 'bottom'}`);
+      showToast(toTop ? t(locale, dict, 'client.returnedTop') : t(locale, dict, 'client.returnedBottom'));
     } else {
       returnCards(cardsToReturn, toTop);
     }
@@ -188,6 +194,7 @@ export default function Client() {
 
   const handleTakeBack = () => {
     if (!activeGameState || activeGameState.playStack.length === 0) return;
+    if (isUndoingRef.current) return;
     const topBatch = activeGameState.playStack[activeGameState.playStack.length - 1];
 
     if (isPreview) {
@@ -196,9 +203,11 @@ export default function Client() {
         playStack: prev.playStack.slice(0, -1),
       }));
       setLocalHand(prev => [...prev, ...topBatch]);
-      showToast('Undo play');
+      showToast(t(locale, dict, 'client.undone'));
     } else {
+      isUndoingRef.current = true;
       takeBackCards(topBatch);
+      setTimeout(() => { isUndoingRef.current = false; }, 500);
     }
   };
 
@@ -224,34 +233,6 @@ export default function Client() {
       } else if (isVertical && dy > 50) {
         handleReturnSelected(false);
       }
-    } else if (isVertical && dy > 55) {
-      handleDrawAction();
-    }
-
-    touchStartRef.current = null;
-  };
-
-  const handleActionDockGestureEnd = (e: React.TouchEvent) => {
-    const start = touchStartRef.current;
-    if (!start) return;
-
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
-    const isVertical = Math.abs(dy) >= Math.abs(dx);
-
-    if (selectedCards.length > 0) {
-      if (isVertical && dy < -50) {
-        handlePlaySelected();
-      } else if (isVertical && dy > 50) {
-        handleReturnSelected(false);
-      } else if (!isVertical && dx < -50) {
-        handleReturnSelected(true);
-      } else if (!isVertical && dx > 50) {
-        handleReturnSelected(false);
-      }
-    } else if (isVertical && dy > 55) {
-      handleDrawAction();
     }
 
     touchStartRef.current = null;
@@ -310,17 +291,34 @@ export default function Client() {
     );
   };
 
-  const renderMiniCard = (card: Card) => {
-    const tone = deckCardTone(card);
+  const renderPlayStackCard = (card: Card, index = 0, total = 1) => {
+    const tone = cardTone(card);
     const suitIcon = SUIT_SYMBOLS[card.suit];
+    const spread = total > 1 ? (index / (total - 1)) * 2 - 1 : 0;
+    const fanTilt = spread * 7;
+    const fanLift = Math.abs(spread) * 10;
 
     return (
       <div
         key={card.id}
-        className="w-12 h-16 rounded-lg bg-white shadow-md border border-slate-300 flex flex-col justify-between p-1 flex-shrink-0"
+        className="relative aspect-[2/3] rounded-[1.25rem] bg-gradient-to-b from-white to-slate-100 shadow-[0_10px_24px_rgba(0,0,0,0.22)] border border-white/80 flex flex-col justify-between p-2"
+        style={{
+          transform: `translateY(${fanLift}px) rotate(${fanTilt}deg)`,
+          zIndex: 10 + index,
+          minWidth: '5.8rem',
+        }}
       >
-        <div className={`text-xs font-black leading-none ${tone}`}>{card.rank}</div>
-        <div className={`text-lg self-center leading-none ${tone}`}>{suitIcon}</div>
+        <div className="flex items-start justify-between">
+          <div className={`text-lg font-black leading-none ${tone}`}>{card.rank}</div>
+          <div className={`text-[0.7rem] font-black uppercase tracking-[0.24em] ${isRedSuit(card.suit) ? 'text-red-500/80' : 'text-slate-500'}`}>
+            {card.suit === 'none' ? 'wild' : card.suit}
+          </div>
+        </div>
+        <div className={`self-center text-4xl leading-none ${tone}`}>{suitIcon}</div>
+        <div className="flex items-end justify-between">
+          <div className={`text-lg font-black leading-none rotate-180 ${tone}`}>{card.rank}</div>
+          <div className={`text-xl leading-none rotate-180 ${tone}`}>{suitIcon}</div>
+        </div>
       </div>
     );
   };
@@ -331,32 +329,32 @@ export default function Client() {
         <div className="w-full max-w-sm rounded-[1.75rem] border border-white/10 bg-white/5 backdrop-blur-xl p-5 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
           {status === 'failed' ? (
             <div className="text-center">
-              <div className="text-rose-400 text-2xl font-black mb-2">Connection Failed</div>
+              <div className="text-rose-400 text-2xl font-black mb-2">{t(locale, dict, 'client.connectionFailed')}</div>
               <div className="text-slate-300 mb-5 text-sm leading-relaxed">{error}</div>
               <button
                 onClick={retry}
                 className="w-full rounded-2xl bg-rose-500/90 hover:bg-rose-500 text-white font-black py-3 shadow-lg active:scale-[0.98] transition-all"
               >
-                Retry Connection
+                {t(locale, dict, 'client.retry')}
               </button>
             </div>
           ) : (
             <div className="text-center">
               <div className="text-slate-100 text-2xl font-black mb-2">
                 {status === 'retrying'
-                  ? 'Retrying…'
+                  ? t(locale, dict, 'client.retrying')
                   : status === 'reconnecting'
-                    ? 'Reconnecting…'
-                    : 'Connecting to Host…'}
+                    ? t(locale, dict, 'client.reconnecting')
+                    : t(locale, dict, 'client.connecting')}
               </div>
-              <div className="text-slate-400 text-sm">Room ID: {hostId}</div>
+              <div className="text-slate-400 text-sm">{t(locale, dict, 'client.roomId')}: {hostId}</div>
             </div>
           )}
         </div>
 
         <div className="mt-4 w-full max-w-sm rounded-[1.5rem] border border-cyan-400/20 bg-cyan-500/10 p-4 text-center">
-          <div className="text-cyan-300 font-black text-sm uppercase tracking-[0.2em] mb-1">Preview Mode</div>
-          <p className="text-xs text-cyan-100/80 mb-3">Open the client hand UI offline to test taps and swipes.</p>
+          <div className="text-cyan-300 font-black text-sm uppercase tracking-[0.2em] mb-1">{t(locale, dict, 'client.previewMode')}</div>
+          <p className="text-xs text-cyan-100/80 mb-3">{t(locale, dict, 'client.previewHint')}</p>
           <button
             onClick={() => setSearchParams(prev => {
               const next = new URLSearchParams(prev);
@@ -365,8 +363,19 @@ export default function Client() {
             })}
             className="w-full rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-3 shadow-lg active:scale-[0.98] transition-all"
           >
-            Enter UI Preview
+            {t(locale, dict, 'client.enterPreview')}
           </button>
+        </div>
+        <div className="mt-4">
+          <select
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as Locale)}
+            className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-bold text-white/80 appearance-none cursor-pointer outline-none hover:bg-white/15 transition-colors text-center"
+          >
+            {LOCALES.map(({ code, label }) => (
+              <option key={code} value={code} className="bg-slate-800 text-white">{label}</option>
+            ))}
+          </select>
         </div>
       </div>
     );
@@ -376,7 +385,7 @@ export default function Client() {
 
   if (viewOther && targetPlayer) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#020617_70%)] text-white p-4 flex flex-col">
+      <div className="h-dvh bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#020617_70%)] text-white p-4 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => {
@@ -385,17 +394,17 @@ export default function Client() {
             }}
             className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-black text-sky-300 active:scale-[0.98] transition-all"
           >
-            ← Back
+            {t(locale, dict, 'client.backToHand')}
           </button>
-          <div className="text-xs font-black uppercase tracking-[0.25em] text-white/45">Inspect Hand</div>
+          <div className="text-xs font-black uppercase tracking-[0.25em] text-white/45">{t(locale, dict, 'client.inspectHand')}</div>
           <div className="w-16" />
         </div>
 
         {stolenCardResult ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300">
-            <div className="text-3xl font-black text-emerald-400 mb-2">Card taken</div>
+            <div className="text-3xl font-black text-emerald-400 mb-2">{t(locale, dict, 'client.cardTaken')}</div>
             <p className="text-slate-300 mb-6 max-w-xs">
-              You randomly pulled this card from {targetPlayer.name}&apos;s hidden hand.
+              {t(locale, dict, 'client.stolenHint', { name: targetPlayer.name })}
             </p>
             <div className="w-48 mb-8">{renderCard(stolenCardResult, 0, 1)}</div>
             <button
@@ -404,7 +413,7 @@ export default function Client() {
                 setStolenCardResult(null);
                 setViewOther(null);
                 setRecentlyDrawnCardIds(prev => [...prev, stolenId]);
-                setToastMessage('+1 Card Stolen');
+                setToastMessage(t(locale, dict, 'client.stolenToast'));
                 window.setTimeout(() => {
                   setRecentlyDrawnCardIds(prev => prev.filter(id => id !== stolenId));
                   setToastMessage(null);
@@ -412,14 +421,14 @@ export default function Client() {
               }}
               className="w-full max-w-sm rounded-2xl bg-emerald-500 text-slate-950 font-black py-4 shadow-[0_0_24px_rgba(16,185,129,0.35)] active:scale-[0.98] transition-all"
             >
-              Back to Hand
+              {t(locale, dict, 'client.backToHand')}
             </button>
           </div>
         ) : (
           <>
             <div className="rounded-[1.5rem] border border-sky-400/20 bg-sky-500/10 p-4 mb-5 text-center">
-              <div className="text-xl font-black text-white">{targetPlayer.name}&apos;s Hidden Hand</div>
-              <div className="text-sm text-sky-100/80 mt-1">Tap a card back to randomly steal it.</div>
+              <div className="text-xl font-black text-white">{t(locale, dict, 'client.hiddenHand', { name: targetPlayer.name })}</div>
+              <div className="text-sm text-sky-100/80 mt-1">{t(locale, dict, 'client.tapToSteal')}</div>
             </div>
 
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 content-start">
@@ -455,12 +464,12 @@ export default function Client() {
                   <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top,_white_0%,_transparent_55%)]" />
                   <div className="relative h-full flex flex-col items-center justify-center">
                     <div className="text-white/30 text-4xl font-black mb-1">?</div>
-                    <div className="rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">Tap to Draw</div>
+                    <div className="rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">{t(locale, dict, 'client.tapToDraw')}</div>
                   </div>
                 </button>
               ))}
               {targetPlayer.handCount === 0 && (
-                <div className="col-span-3 sm:col-span-4 text-center text-slate-500 mt-10">No cards in hand to steal.</div>
+                <div className="col-span-3 sm:col-span-4 text-center text-slate-500 mt-10">{t(locale, dict, 'client.noCardsToSteal')}</div>
               )}
             </div>
           </>
@@ -472,7 +481,8 @@ export default function Client() {
   const totalStackCards = activeGameState?.playStack.reduce((acc, batch) => acc + batch.length, 0) ?? 0;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#1e293b_0%,_#020617_60%)] text-white relative overflow-hidden">
+    <div className="h-dvh flex flex-col bg-[#07111f] text-white relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.12),transparent_35%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.08),transparent_30%),linear-gradient(to_bottom,rgba(2,6,23,0.1),rgba(2,6,23,0.3))]" />
       {toastMessage && (
         <div className="pointer-events-none absolute top-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="rounded-full border border-emerald-300/40 bg-emerald-500 px-5 py-2.5 text-sm font-black text-white shadow-[0_0_30px_rgba(34,197,94,0.45)] whitespace-nowrap">
@@ -488,166 +498,165 @@ export default function Client() {
       )}
 
       {activeGameState && (
-        <div className="sticky top-0 z-30 border-b border-white/5 bg-slate-950/55 backdrop-blur-xl">
+        <div className="shrink-0 border-b border-white/5 bg-slate-950/55 backdrop-blur-xl">
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
             <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-slate-200">
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(34,197,94,0.7)]" />
-              {status === 'connected' ? 'Live' : 'Syncing'}
+              {status === 'connected' ? t(locale, dict, 'host.live') : 'Syncing'}
             </div>
 
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-slate-300">
+              <button
+                onClick={handleDrawAction}
+                disabled={isDrawing}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 cursor-pointer active:scale-[0.95] transition-all hover:bg-white/10 disabled:opacity-50"
+              >
+                {t(locale, dict, 'tableConfig.deck')} <span className="text-white">{activeGameState.deckCount}</span>
+              </button>
               <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                Deck <span className="text-white">{activeGameState.deckCount}</span>
-              </div>
-              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                Discard <span className="text-white">{activeGameState.discardPile.length}</span>
+                {t(locale, dict, 'tableConfig.discard')} <span className="text-white">{activeGameState.discardPile.length}</span>
               </div>
             </div>
+
+            <select
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as Locale)}
+              className="rounded border border-white/10 bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white/80 appearance-none cursor-pointer outline-none hover:bg-slate-700 transition-colors"
+            >
+              {LOCALES.map(({ code, label }) => (
+                <option key={code} value={code} className="bg-slate-800 text-white">{label}</option>
+              ))}
+            </select>
           </div>
         </div>
       )}
 
-      <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-3xl flex-col px-4 pb-4 pt-4">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-4 pb-2 pt-2 gap-2">
         {activeGameState && (
-          <div className="mb-4 rounded-[1.5rem] border border-white/8 bg-white/5 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/45">Play Stack</div>
-                <div className="text-sm text-white/70">{totalStackCards} cards on the table</div>
+          <>
+            {/* Play stack - full size cards with horizontal scroll */}
+            <div className="min-h-0 flex-1 rounded-[1.75rem] border border-white/8 bg-[linear-gradient(180deg,_rgba(255,255,255,0.07),_rgba(255,255,255,0.03))] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl flex flex-col">
+              <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-1">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/45">{t(locale, dict, 'tableConfig.playStackLabel')}</div>
+                  <div className="text-xs text-white/60">{t(locale, dict, 'client.playStack')}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {latestPlayBatch && activeGameState.playStack.length > 0 && (
+                    <button
+                      onClick={handleTakeBack}
+                      className="rounded-full border border-amber-300/20 bg-amber-400/15 px-2.5 py-1 text-[9px] font-black text-amber-200 active:scale-[0.98] transition-all"
+                    >
+                      {t(locale, dict, 'client.undoPlay')}
+                    </button>
+                  )}
+                  <div className="rounded-full border border-white/8 bg-slate-950/40 px-2.5 py-1 text-[10px] font-black text-white/85">
+                    {totalStackCards} {t(locale, dict, 'client.cards')}
+                  </div>
+                </div>
               </div>
-              {latestPlayBatch && activeGameState.playStack.length > 0 && (
-                <button
-                  onClick={handleTakeBack}
-                  className="rounded-full border border-amber-300/20 bg-amber-400/15 px-3 py-1.5 text-xs font-black text-amber-200 active:scale-[0.98] transition-all"
-                >
-                  Undo last play
-                </button>
-              )}
-            </div>
 
-            <div className="relative flex min-h-40 items-center justify-center overflow-hidden rounded-[1.25rem] border border-dashed border-white/8 bg-slate-950/35 p-4">
-              {activeGameState.playStack.length > 0 ? (
-                <div className="relative h-36 w-56">
-                  {activeGameState.playStack.slice(-3).map((batch, batchIndex) => {
-                    const isTopBatch = batchIndex === activeGameState.playStack.slice(-3).length - 1;
-                    const offset = batchIndex * 10;
-                    return (
-                      <div
-                        key={`${batchIndex}-${batch[0]?.id ?? 'batch'}`}
-                        className={`absolute inset-0 rounded-[1.25rem] border ${isTopBatch ? 'border-amber-300/50 bg-amber-400/10' : 'border-white/8 bg-white/5'} shadow-2xl`}
-                        style={{
-                          transform: `translate(${offset}px, ${-offset}px) rotate(${(batchIndex - 1) * 4}deg)`,
-                        }}
-                      >
-                        <div className="flex h-full items-center justify-center gap-2 overflow-hidden rounded-[1.25rem] p-3">
-                          {batch.map(renderMiniCard)}
-                        </div>
-                        {isTopBatch && (
-                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.24em] text-slate-950 shadow-lg">
-                            Latest
-                          </div>
-                        )}
+              <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none pb-2">
+                <div className="flex h-full items-end gap-0 px-1 py-2">
+                  {activeGameState.playStack.flat().length > 0 ? (
+                    activeGameState.playStack.flat().map((card, index, arr) => (
+                      <div key={card.id} className="-ml-6 first:ml-0" style={{ zIndex: index + 1 }}>
+                        {renderPlayStackCard(card, index, arr.length)}
                       </div>
-                    );
-                  })}
+                    ))
+                  ) : (
+                    <div className="flex flex-1 items-center justify-center h-full">
+                      <div className="rounded-[1.25rem] border border-dashed border-white/8 bg-slate-950/35 px-4 py-6 text-center text-white/35 w-full">
+                        {t(locale, dict, 'tableConfig.playStackEmpty')}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="text-center text-white/35">
-                  <div className="text-lg font-black uppercase tracking-[0.3em]">Empty Stack</div>
-                  <div className="mt-2 text-xs text-white/25">{DEFAULT_SANDBOX_PACK.containers.playStack.emptyText}</div>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
-        )}
 
-        {activeGameState && Object.keys(activeGameState.players).length > 1 && (
-          <div className="mb-4 rounded-[1.5rem] border border-white/8 bg-white/5 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-            <div className="mb-3 text-[10px] font-black uppercase tracking-[0.3em] text-white/45">Other Hands</div>
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {Object.values(activeGameState.players)
-                .filter(player => player.id !== peerId)
-                .map(player => (
-                  <button
-                    key={player.id}
-                    type="button"
-                    onClick={() => setViewOther(player.id)}
-                    className="w-32 flex-shrink-0 rounded-[1.2rem] border border-white/8 bg-slate-950/60 p-3 text-left shadow-lg active:scale-[0.98] transition-all"
-                  >
-                    <div className="text-sm font-black text-white truncate">{player.name}</div>
-                    <div className="mt-1 text-xs text-slate-400">{player.handCount} cards</div>
-                    <div className="mt-3 text-[10px] font-black uppercase tracking-[0.24em] text-sky-300">Peek & draw</div>
-                  </button>
-                ))}
-            </div>
-          </div>
+            {/* Other players compact row */}
+            {Object.keys(activeGameState.players).length > 1 && (
+              <div className="flex shrink-0 gap-1.5 overflow-x-hidden">
+                {Object.values(activeGameState.players)
+                  .filter(player => player.id !== peerId)
+                  .map(player => (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => setViewOther(player.id)}
+                      className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/8 bg-slate-950/60 px-2.5 py-1 text-left shadow-lg active:scale-[0.98] transition-all"
+                    >
+                      <div className="text-xs font-black text-white truncate max-w-[5rem]">{player.name}</div>
+                      <div className="text-[10px] text-slate-400">{player.handCount}{t(locale, dict, 'client.cards')}</div>
+                      <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-300">{t(locale, dict, 'client.peekDraw')}</div>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </>
         )}
 
         <div
-          className="mb-4 rounded-[1.75rem] border border-white/8 bg-[linear-gradient(180deg,_rgba(255,255,255,0.07),_rgba(255,255,255,0.03))] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+          className="min-h-0 flex-1 rounded-[1.75rem] border border-white/8 bg-[linear-gradient(180deg,_rgba(255,255,255,0.07),_rgba(255,255,255,0.03))] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl flex flex-col"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleHandGestureEnd}
         >
-          <div className="mb-3 flex items-end justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-1">
             <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/45">Your Hand</div>
-              <div className="text-sm text-white/70">Tap cards to select. Swipe up to play.</div>
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-white/45">{t(locale, dict, 'client.yourHand')}</div>
+              <div className="text-xs text-white/60">{t(locale, dict, 'client.handHint')}</div>
             </div>
-            <div className="rounded-full border border-white/8 bg-slate-950/40 px-3 py-1.5 text-xs font-black text-white/85">
-              {hand.length} cards
-            </div>
-          </div>
-
-          <div className="overflow-x-auto pb-2">
-            <div className="flex items-end gap-0 px-1 py-3">
-              {displayHand.map((card, index) => (
-                <div key={card.id} className="-ml-8 first:ml-0 first:pl-0" style={{ zIndex: index + 1 }}>
-                  {renderCard(card, index, displayHand.length)}
-                </div>
-              ))}
+            <div className="rounded-full border border-white/8 bg-slate-950/40 px-2.5 py-1 text-[10px] font-black text-white/85">
+              {hand.length} {t(locale, dict, 'client.cards')}
             </div>
           </div>
 
-          {hand.length === 0 && (
-            <div className="rounded-[1.25rem] border border-dashed border-white/8 bg-slate-950/35 px-4 py-10 text-center text-white/35">
-              No cards in hand. Swipe down to draw.
-            </div>
-          )}
-        </div>
-
-        <div
-          className={`mt-auto rounded-[1.75rem] border ${selectedCards.length > 0 ? 'border-amber-300/25 bg-amber-400/10' : 'border-cyan-300/15 bg-cyan-500/8'} p-4 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl`}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleActionDockGestureEnd}
-        >
-          {selectedCards.length > 0 ? (
-            <div className="text-center">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-200/80">
-                {selectedCards.length} selected
-              </div>
-              <div className="mt-2 text-sm text-amber-50/90">Swipe up to play, left for deck top, right for deck bottom.</div>
-              <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-amber-100/80">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">← Top</span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">↑ Play</span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Bottom →</span>
+          {hand.length > 0 ? (
+            <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none pb-2">
+              <div className="flex h-full items-end gap-0 px-1 py-2">
+                {displayHand.map((card, index) => (
+                  <div key={card.id} className="-ml-6 first:ml-0 first:pl-0" style={{ zIndex: index + 1 }}>
+                    {renderCard(card, index, displayHand.length)}
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
-            <div className="text-center">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-200/70">Gesture Dock</div>
-              <div className="mt-2 text-sm text-cyan-50/80">Swipe down here to draw a card.</div>
-              <div className="mt-3 text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/60">Tap cards to build a play, then swipe.</div>
+            <div className="flex items-center justify-center px-4 pb-4 min-h-0 flex-1">
+              <div className="rounded-[1.25rem] border border-dashed border-white/8 bg-slate-950/35 px-4 py-6 text-center text-white/35 w-full">
+                {t(locale, dict, 'client.noCards')}
+              </div>
             </div>
           )}
         </div>
-      </div>
 
-      {selectedCards.length > 0 && (
-        <div className="pointer-events-none fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-[1.5rem] border border-white/8 bg-slate-950/70 px-4 py-3 text-center shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-          <div className="text-xs font-black uppercase tracking-[0.3em] text-white/45">Selection ready</div>
-          <div className="mt-1 text-sm text-white/75">Gesture dock handles play and return. Tap a selected card to deselect.</div>
-        </div>
-      )}
+        {/* Play action bar for selected cards */}
+        {selectedCards.length > 0 && (
+          <div className="shrink-0 rounded-[1.5rem] border border-amber-300/25 bg-amber-400/10 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+            <div className="flex items-center justify-center gap-3 text-center">
+              <button
+                onClick={() => handleReturnSelected(true)}
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/80 active:scale-[0.98] transition-all"
+              >
+                ← {t(locale, dict, 'client.swipeTop')}
+              </button>
+              <button
+                onClick={handlePlaySelected}
+                className="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-lg active:scale-[0.98] transition-all"
+              >
+                ↑ {t(locale, dict, 'client.swipePlay')}
+              </button>
+              <button
+                onClick={() => handleReturnSelected(false)}
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/80 active:scale-[0.98] transition-all"
+              >
+                {t(locale, dict, 'client.swipeBottom')} →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

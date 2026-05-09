@@ -54,7 +54,12 @@ export function useClient(hostId: string, playerName: string) {
             setGameState(message.payload);
             break;
           case 'RECEIVE_CARDS':
-            setHand(prev => [...prev, ...message.payload]);
+            setHand(prev => {
+              const existingIds = new Set(prev.map(c => c.id));
+              const newCards = message.payload.filter(c => !existingIds.has(c.id));
+              if (newCards.length === 0) return prev;
+              return [...prev, ...newCards];
+            });
             break;
           case 'REMOVE_CARDS':
             setHand(prev => prev.filter(c => !message.payload.includes(c.id)));
