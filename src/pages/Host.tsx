@@ -205,7 +205,19 @@ export default function Host() {
           </div>
 
 
-{/* Reset shuffle - bottom left corner gap */}
+{/* Clear play stack - below center area */}
+          {gameState.playStack.flat().length > 0 && (
+            <div className="pointer-events-auto absolute left-1/2 z-10 -translate-x-1/2" style={{ bottom: '22%' }}>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('host-clear-table'))}
+                className="rounded-lg border border-rose-300/20 bg-rose-950/70 px-2.5 py-1.5 text-[11px] font-bold text-rose-200/90 shadow-[0_4px_16px_rgba(2,6,23,0.4)] transition-all hover:bg-rose-900/70 active:scale-95"
+              >
+                {t(locale, dict, 'tableConfig.playStackAction')}
+              </button>
+            </div>
+          )}
+
+          {/* Reset shuffle - bottom left corner gap */}
           <div className="pointer-events-auto absolute bottom-0 left-0 z-10 flex h-14 w-14 items-center justify-center">
             <button
               onClick={() => { resetGame(); playShuffleSound(); }}

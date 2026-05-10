@@ -184,6 +184,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     playCards,
     returnCards,
     drawFromOther,
+    clearTable,
     undoLastAction,
   } = useClient(hostId, playerName);
 
@@ -553,12 +554,24 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
             <div className="text-center">
               <div className="text-rose-400 text-2xl font-black mb-2">{t(locale, dict, 'client.connectionFailed')}</div>
               <div className="text-slate-300 mb-5 text-sm leading-relaxed">{error}</div>
-              <button
-                onClick={retry}
-                className="w-full rounded-2xl bg-rose-500/90 hover:bg-rose-500 text-white font-black py-3 shadow-lg active:scale-[0.98] transition-all"
-              >
-                {t(locale, dict, 'client.retry')}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={retry}
+                  className="flex-1 rounded-2xl bg-rose-500/90 hover:bg-rose-500 text-white font-black py-3 shadow-lg active:scale-[0.98] transition-all"
+                >
+                  {t(locale, dict, 'client.retry')}
+                </button>
+                <button
+                  onClick={() => setSearchParams(prev => {
+                    const next = new URLSearchParams(prev);
+                    next.delete('name');
+                    return next;
+                  })}
+                  className="flex-1 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-black py-3 shadow-lg active:scale-[0.98] transition-all"
+                >
+                  {t(locale, dict, 'client.changeName')}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="text-center">
@@ -709,7 +722,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
   const totalStackCards = activeGameState?.playStack.reduce((acc, batch) => acc + batch.length, 0) ?? 0;
 
   return (
-    <div ref={containerRef} className="h-dvh flex flex-col bg-[#07111f] text-white relative overflow-hidden touch-none overscroll-none">
+    <div ref={containerRef} className="h-dvh flex flex-col bg-[#07111f] text-white relative overflow-hidden touch-none overscroll-none select-none">
       <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.12),transparent_35%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.08),transparent_30%),linear-gradient(to_bottom,rgba(2,6,23,0.1),rgba(2,6,23,0.3))]" />
       {toastMessage && (
         <div className="pointer-events-none absolute top-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -802,9 +815,31 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
                     <div className="text-[10px] font-black text-emerald-300 animate-pulse">↓ {t(locale, dict, 'client.releaseToPlay')}</div>
                   )}
                 </div>
-                <div className="rounded-full border border-white/8 bg-slate-950/40 px-2.5 py-1 text-[10px] font-black text-white/85">
+                <div className="flex items-center gap-1.5">
+                  {totalStackCards > 0 && (
+                    <button
+                      onClick={() => {
+                        if (isPreview) {
+                          const flattened = activeGameState.playStack.flat();
+                          setLocalGameState(prev => ({
+                            ...prev,
+                            playStack: [],
+                            discardPile: [...prev.discardPile, ...flattened],
+                          }));
+                          setLocalEventLog(prev => [...prev, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const, cards: flattened }]);
+                        } else {
+                          clearTable();
+                        }
+                      }}
+                      className="rounded-lg border border-rose-300/20 bg-rose-950/60 px-2 py-1 text-[10px] font-bold text-rose-200/80 active:scale-95 transition-all hover:bg-rose-900/70"
+                    >
+                      {t(locale, dict, 'tableConfig.playStackAction')}
+                    </button>
+                  )}
+                  <div className="rounded-full border border-white/8 bg-slate-950/40 px-2.5 py-1 text-[10px] font-black text-white/85">
                     {totalStackCards} {t(locale, dict, 'client.cards')}
                   </div>
+                </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 touch-pan-x">

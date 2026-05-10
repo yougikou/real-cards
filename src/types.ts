@@ -53,7 +53,8 @@ export type ClientAction =
   | { type: 'PLAY'; payload: { cards: Card[] } }
   | { type: 'TAKE_BACK'; payload: { cards: Card[] } } // Take back from current play stack top
   | { type: 'DRAW_FROM_OTHER'; payload: { targetPlayerId: string, cardId: string } }
-  | { type: 'UNDO_LAST_ACTION'; payload: Record<string, never> };
+  | { type: 'UNDO_LAST_ACTION'; payload: Record<string, never> }
+  | { type: 'CLEAR_TABLE'; payload: Record<string, never> };
 
 // Message sent from Host to Client
 export type HostMessage =

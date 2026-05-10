@@ -77,6 +77,9 @@ export function useHost() {
   // Per-client action history for undo
   const clientActionHistoryRef = useRef<Record<string, { type: string; payload: any }[]>>({});
 
+  // Track player name → peer ID mapping so reconnecting clients keep their identity
+  const nameToPeerIdRef = useRef<Record<string, string>>({});
+
   const broadcastState = (newState: GameState) => {
     const message: HostMessage = { type: 'STATE_UPDATE', payload: newState };
     Object.values(connectionsRef.current).forEach(conn => {
@@ -103,14 +106,61 @@ export function useHost() {
 
     switch (action.type) {
       case 'JOIN': {
+        const playerName = action.payload.name;
+        const existingPeerId = nameToPeerIdRef.current[playerName];
+
+        if (existingPeerId && existingPeerId !== clientId) {
+          if (connectionsRef.current[existingPeerId]) {
+            // Original player still connected → duplicate name, reject
+            connectionsRef.current[clientId]?.send({ type: 'ERROR', payload: `Name "${playerName}" is already taken.` });
+            break;
+          }
+          // Reconnection: transfer server state from old peer ID to new
+          if (serverStateRef.current.playerHands[existingPeerId]) {
+            serverStateRef.current.playerHands[clientId] = serverStateRef.current.playerHands[existingPeerId];
+            delete serverStateRef.current.playerHands[existingPeerId];
+          }
+          if (clientActionHistoryRef.current[existingPeerId]) {
+            clientActionHistoryRef.current[clientId] = clientActionHistoryRef.current[existingPeerId];
+            delete clientActionHistoryRef.current[existingPeerId];
+          }
+          nameToPeerIdRef.current[playerName] = clientId;
+
+          const existingHand = serverStateRef.current.playerHands[clientId] || [];
+          updateStateAndBroadcast(prev => {
+            const newPlayers = { ...prev.players };
+            delete newPlayers[existingPeerId];
+            newPlayers[clientId] = { id: clientId, name: playerName, handCount: existingHand.length };
+            return {
+              ...prev,
+              players: newPlayers,
+              eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'JOIN' as const, playerName }]
+            };
+          });
+
+          // Send existing cards back to reconnecting client
+          if (existingHand.length > 0) {
+            connectionsRef.current[clientId]?.send({ type: 'RECEIVE_CARDS', payload: existingHand });
+          }
+          break;
+        }
+
+        // Duplicate name check for genuinely new connections
+        const isNameTaken = Object.values(gameStateRef.current.players).some(p => p.name === playerName);
+        if (isNameTaken) {
+          connectionsRef.current[clientId]?.send({ type: 'ERROR', payload: `Name "${playerName}" is already taken.` });
+          break;
+        }
+
+        nameToPeerIdRef.current[playerName] = clientId;
         serverStateRef.current.playerHands[clientId] = [];
         updateStateAndBroadcast(prev => ({
           ...prev,
           players: {
             ...prev.players,
-            [clientId]: { id: clientId, name: action.payload.name, handCount: 0 }
+            [clientId]: { id: clientId, name: playerName, handCount: 0 }
           },
-          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'JOIN' as const, playerName: action.payload.name }]
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'JOIN' as const, playerName }]
         }));
         break;
       }
@@ -232,6 +282,19 @@ export function useHost() {
             eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'DRAW_FROM_OTHER' as const, playerName: prev.players[clientId]?.name, targetPlayerName: prev.players[targetPlayerId]?.name, count: 1 }]
           }));
         }
+        break;
+      }
+      case 'CLEAR_TABLE': {
+        updateStateAndBroadcast(prev => {
+          if (prev.playStack.length === 0) return prev;
+          const flattenedStack = prev.playStack.flat();
+          return {
+            ...prev,
+            playStack: [],
+            discardPile: [...prev.discardPile, ...flattenedStack],
+            eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const, cards: flattenedStack }]
+          };
+        });
         break;
       }
       case 'UNDO_LAST_ACTION': {
@@ -596,14 +659,8 @@ export function useHost() {
       });
 
       conn.on('close', () => {
-        // Handle player disconnect
-        setGameState(prev => {
-          const newPlayers = { ...prev.players };
-          delete newPlayers[conn.peer];
-          return { ...prev, players: newPlayers };
-        });
+        // Keep player state for potential reconnection on refresh
         delete connectionsRef.current[conn.peer];
-        delete clientActionHistoryRef.current[conn.peer];
       });
     });
 
