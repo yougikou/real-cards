@@ -67,7 +67,10 @@ export function useClient(hostId: string, playerName: string) {
             setHand(prev => prev.filter(c => !message.payload.includes(c.id)));
             break;
           case 'ERROR':
-            console.error('Server error:', message.payload);
+            clearTimeout(timeout);
+            conn.close();
+            setStatus('failed');
+            setError(message.payload);
             break;
         }
       });
@@ -152,6 +155,10 @@ export function useClient(hostId: string, playerName: string) {
     sendAction({ type: 'DRAW_FROM_OTHER', payload: { targetPlayerId, cardId } });
   };
 
+  const clearTable = () => {
+    sendAction({ type: 'CLEAR_TABLE', payload: {} });
+  };
+
   const undoLastAction = () => {
     if (undoableActionCountRef.current === 0) return;
     undoableActionCountRef.current -= 1;
@@ -171,6 +178,7 @@ export function useClient(hostId: string, playerName: string) {
     playCards,
     returnCards,
     drawFromOther,
+    clearTable,
     undoLastAction,
   };
 }
