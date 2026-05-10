@@ -13,11 +13,36 @@ export interface Player {
   handCount: number; // For others to know how many cards
 }
 
+export type GameEventType =
+  | 'JOIN'
+  | 'DRAW'
+  | 'PLAY'
+  | 'RETURN'
+  | 'DRAW_FROM_OTHER'
+  | 'UNDO'
+  | 'HOST_DEAL'
+  | 'HOST_DRAW_TO_TABLE'
+  | 'HOST_RETURN_BATCH'
+  | 'HOST_CLEAR_TABLE'
+  | 'HOST_DISCARD'
+  | 'HOST_TAKE_FROM_TABLE'
+  | 'HOST_RETURN_TO_TABLE';
+
+export interface GameEvent {
+  timestamp: number;
+  type: GameEventType;
+  playerName?: string;
+  cards?: Card[];
+  count?: number;
+  targetPlayerName?: string;
+}
+
 export interface GameState {
   deckCount: number;
   discardPile: Card[];
   playStack: Card[][]; // Stack of played batches
   players: Record<string, Player>;
+  eventLog: GameEvent[];
 }
 
 // Action sent from Client to Host
@@ -27,7 +52,8 @@ export type ClientAction =
   | { type: 'RETURN'; payload: { cards: Card[], toTop: boolean } }
   | { type: 'PLAY'; payload: { cards: Card[] } }
   | { type: 'TAKE_BACK'; payload: { cards: Card[] } } // Take back from current play stack top
-  | { type: 'DRAW_FROM_OTHER'; payload: { targetPlayerId: string, cardId: string } };
+  | { type: 'DRAW_FROM_OTHER'; payload: { targetPlayerId: string, cardId: string } }
+  | { type: 'UNDO_LAST_ACTION'; payload: Record<string, never> };
 
 // Message sent from Host to Client
 export type HostMessage =
