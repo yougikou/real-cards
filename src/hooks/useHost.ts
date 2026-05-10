@@ -18,6 +18,7 @@ export function useHost() {
     discardPile: [],
     playStack: [],
     players: {},
+    eventLog: [],
   });
   const gameStateRef = useRef(gameState);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -59,7 +60,8 @@ export function useHost() {
         deckCount: serverStateRef.current.deck.length,
         playStack: [],
         discardPile: [],
-        players: newPlayers
+        players: newPlayers,
+        eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const }]
       };
     });
 
@@ -72,6 +74,9 @@ export function useHost() {
     playerHands: {} as Record<string, Card[]>,
   });
 
+  // Per-client action history for undo
+  const clientActionHistoryRef = useRef<Record<string, { type: string; payload: any }[]>>({});
+
   const broadcastState = (newState: GameState) => {
     const message: HostMessage = { type: 'STATE_UPDATE', payload: newState };
     Object.values(connectionsRef.current).forEach(conn => {
@@ -79,15 +84,23 @@ export function useHost() {
     });
   };
 
+  const MAX_EVENT_LOG = 200;
+
   const updateStateAndBroadcast = (updater: (prev: GameState) => GameState) => {
     setGameState(prev => {
       const next = updater(prev);
+      if (next.eventLog.length > MAX_EVENT_LOG) {
+        next.eventLog = next.eventLog.slice(-MAX_EVENT_LOG);
+      }
       broadcastState(next);
       return next;
     });
   };
 
   const handleClientAction = (clientId: string, action: ClientAction) => {
+    const history = clientActionHistoryRef.current;
+    if (!history[clientId]) history[clientId] = [];
+
     switch (action.type) {
       case 'JOIN': {
         serverStateRef.current.playerHands[clientId] = [];
@@ -96,7 +109,8 @@ export function useHost() {
           players: {
             ...prev.players,
             [clientId]: { id: clientId, name: action.payload.name, handCount: 0 }
-          }
+          },
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'JOIN' as const, playerName: action.payload.name }]
         }));
         break;
       }
@@ -105,6 +119,8 @@ export function useHost() {
         const drawnCards = serverStateRef.current.deck.splice(0, count);
 
         serverStateRef.current.playerHands[clientId].push(...drawnCards);
+
+        history[clientId].push({ type: 'DRAW', payload: { drawnCards } });
 
         // Send cards to player
         const msg: HostMessage = { type: 'RECEIVE_CARDS', payload: drawnCards };
@@ -119,7 +135,8 @@ export function useHost() {
               ...prev.players[clientId],
               handCount: serverStateRef.current.playerHands[clientId].length
             }
-          }
+          },
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'DRAW' as const, playerName: prev.players[clientId]?.name, count }]
         }));
         break;
       }
@@ -132,6 +149,8 @@ export function useHost() {
           c => !cardIds.includes(c.id)
         );
 
+        history[clientId].push({ type: 'PLAY', payload: { cards } });
+
         updateStateAndBroadcast(prev => ({
           ...prev,
           playStack: [...prev.playStack, cards],
@@ -141,7 +160,8 @@ export function useHost() {
               ...prev.players[clientId],
               handCount: serverStateRef.current.playerHands[clientId].length
             }
-          }
+          },
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'PLAY' as const, playerName: prev.players[clientId]?.name, cards }]
         }));
         break;
       }
@@ -149,9 +169,9 @@ export function useHost() {
         const { cards, toTop } = action.payload;
 
         // Remove from server hand
-        const cardIds = cards.map(c => c.id);
+        const returnCardIds = cards.map(c => c.id);
         serverStateRef.current.playerHands[clientId] = serverStateRef.current.playerHands[clientId].filter(
-          c => !cardIds.includes(c.id)
+          c => !returnCardIds.includes(c.id)
         );
 
         if (toTop) {
@@ -159,6 +179,8 @@ export function useHost() {
         } else {
           serverStateRef.current.deck.push(...cards);
         }
+
+        history[clientId].push({ type: 'RETURN', payload: { cards, toTop } });
 
         updateStateAndBroadcast(prev => ({
           ...prev,
@@ -169,53 +191,8 @@ export function useHost() {
               ...prev.players[clientId],
               handCount: serverStateRef.current.playerHands[clientId].length
             }
-          }
-        }));
-        break;
-      }
-      case 'TAKE_BACK': {
-        const { cards } = action.payload;
-        const takenIds = cards.map(c => c.id);
-
-        // Read current playStack from the ref (up-to-date snap before mutating)
-        const snapPlayStack = gameStateRef.current.playStack;
-        const newPlayStack = [...snapPlayStack];
-        const lastBatch = newPlayStack.pop() || [];
-
-        // Only take back cards that are actually in the popped batch.
-        // This guards against stale/duplicate TAKE_BACK actions (e.g.
-        // double-click) that arrive after the batch was already processed.
-        const validCards = cards.filter(c => lastBatch.some(lc => lc.id === c.id));
-
-        if (validCards.length === 0) {
-          // Stale TAKE_BACK — put the batch back and ignore
-          if (lastBatch.length > 0) {
-            newPlayStack.push(lastBatch);
-          }
-        } else {
-          // Side effects (outside setGameState updater, safe from strict-mode double call)
-          serverStateRef.current.playerHands[clientId].push(...validCards);
-          const msg: HostMessage = { type: 'RECEIVE_CARDS', payload: validCards };
-          connectionsRef.current[clientId]?.send(msg);
-
-          // Put back any cards from the batch that weren't requested
-          const remainingBatch = lastBatch.filter(c => !takenIds.includes(c.id));
-          if (remainingBatch.length > 0) {
-            newPlayStack.push(remainingBatch);
-          }
-        }
-
-        // Pure state update + broadcast (no side effects inside)
-        updateStateAndBroadcast(prev => ({
-          ...prev,
-          playStack: newPlayStack,
-          players: {
-            ...prev.players,
-            [clientId]: {
-              ...prev.players[clientId],
-              handCount: serverStateRef.current.playerHands[clientId].length
-            }
-          }
+          },
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'RETURN' as const, playerName: prev.players[clientId]?.name, cards }]
         }));
         break;
       }
@@ -225,13 +202,17 @@ export function useHost() {
         const targetHand = serverStateRef.current.playerHands[targetPlayerId];
 
         // if cardId is empty, draw a random card from target
-        const actualCardIndex = cardId
+        const actualCardIndex = cardId && targetHand.length > 0
           ? targetHand.findIndex(c => c.id === cardId)
-          : Math.floor(Math.random() * targetHand.length);
+          : targetHand.length > 0
+            ? Math.floor(Math.random() * targetHand.length)
+            : -1;
 
         if (actualCardIndex !== -1) {
           const [stolenCard] = targetHand.splice(actualCardIndex, 1);
           serverStateRef.current.playerHands[clientId].push(stolenCard);
+
+          history[clientId].push({ type: 'DRAW_FROM_OTHER', payload: { stolenCard, targetPlayerId } });
 
           // Notify target to remove
           const removeMsg: HostMessage = { type: 'REMOVE_CARDS', payload: [stolenCard.id] };
@@ -247,8 +228,140 @@ export function useHost() {
               ...prev.players,
               [clientId]: { ...prev.players[clientId], handCount: serverStateRef.current.playerHands[clientId].length },
               [targetPlayerId]: { ...prev.players[targetPlayerId], handCount: targetHand.length },
-            }
+            },
+            eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'DRAW_FROM_OTHER' as const, playerName: prev.players[clientId]?.name, targetPlayerName: prev.players[targetPlayerId]?.name, count: 1 }]
           }));
+        }
+        break;
+      }
+      case 'UNDO_LAST_ACTION': {
+        const clientHistory = history[clientId] || [];
+        const lastAction = clientHistory.pop();
+        if (!lastAction) break;
+
+        switch (lastAction.type) {
+          case 'DRAW': {
+            const { drawnCards } = lastAction.payload;
+            const drawnIds = drawnCards.map((c: Card) => c.id);
+            // Remove from player's hand
+            serverStateRef.current.playerHands[clientId] = serverStateRef.current.playerHands[clientId].filter(
+              (c: Card) => !drawnIds.includes(c.id)
+            );
+            // Return to deck top
+            serverStateRef.current.deck.unshift(...drawnCards);
+            // Notify client to remove
+            const removeMsg: HostMessage = { type: 'REMOVE_CARDS', payload: drawnIds };
+            connectionsRef.current[clientId]?.send(removeMsg);
+
+            updateStateAndBroadcast(prev => ({
+              ...prev,
+              deckCount: serverStateRef.current.deck.length,
+              players: {
+                ...prev.players,
+                [clientId]: {
+                  ...prev.players[clientId],
+                  handCount: serverStateRef.current.playerHands[clientId].length
+                }
+              },
+              eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'UNDO' as const, playerName: prev.players[clientId]?.name }]
+            }));
+            break;
+          }
+          case 'PLAY': {
+            const playCards: Card[] = lastAction.payload.cards;
+            const takenIds = playCards.map(c => c.id);
+            const snapPlayStack = gameStateRef.current.playStack;
+            const newPlayStack = [...snapPlayStack];
+            const lastBatch = newPlayStack.pop() || [];
+            const validCards = playCards.filter(c => lastBatch.some(lc => lc.id === c.id));
+
+            if (validCards.length === 0) {
+              if (lastBatch.length > 0) {
+                newPlayStack.push(lastBatch);
+              }
+            } else {
+              serverStateRef.current.playerHands[clientId].push(...validCards);
+              const receiveMsg: HostMessage = { type: 'RECEIVE_CARDS', payload: validCards };
+              connectionsRef.current[clientId]?.send(receiveMsg);
+              const remainingBatch = lastBatch.filter(c => !takenIds.includes(c.id));
+              if (remainingBatch.length > 0) {
+                newPlayStack.push(remainingBatch);
+              }
+            }
+
+            updateStateAndBroadcast(prev => ({
+              ...prev,
+              playStack: newPlayStack,
+              players: {
+                ...prev.players,
+                [clientId]: {
+                  ...prev.players[clientId],
+                  handCount: serverStateRef.current.playerHands[clientId].length
+                }
+              },
+              eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'UNDO' as const, playerName: prev.players[clientId]?.name }]
+            }));
+            break;
+          }
+          case 'DRAW_FROM_OTHER': {
+            const { stolenCard, targetPlayerId: targetId } = lastAction.payload;
+            // Remove from current player's hand
+            serverStateRef.current.playerHands[clientId] = serverStateRef.current.playerHands[clientId].filter(
+              (c: Card) => c.id !== stolenCard.id
+            );
+            // Give back to target
+            serverStateRef.current.playerHands[targetId].push(stolenCard);
+            // Notify current player to remove
+            const removeCardMsg: HostMessage = { type: 'REMOVE_CARDS', payload: [stolenCard.id] };
+            connectionsRef.current[clientId]?.send(removeCardMsg);
+            // Notify target to receive
+            const receiveCardMsg: HostMessage = { type: 'RECEIVE_CARDS', payload: [stolenCard] };
+            connectionsRef.current[targetId]?.send(receiveCardMsg);
+
+            updateStateAndBroadcast(prev => ({
+              ...prev,
+              players: {
+                ...prev.players,
+                [clientId]: {
+                  ...prev.players[clientId],
+                  handCount: serverStateRef.current.playerHands[clientId].length
+                },
+                [targetId]: {
+                  ...prev.players[targetId],
+                  handCount: serverStateRef.current.playerHands[targetId].length
+                }
+              },
+              eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'UNDO' as const, playerName: prev.players[clientId]?.name }]
+            }));
+            break;
+          }
+          case 'RETURN': {
+            const returnedCards: Card[] = lastAction.payload.cards;
+            const returnedIds = returnedCards.map(c => c.id);
+            // Remove from deck by ID
+            serverStateRef.current.deck = serverStateRef.current.deck.filter(
+              (c: Card) => !returnedIds.includes(c.id)
+            );
+            // Return to player's hand
+            serverStateRef.current.playerHands[clientId].push(...returnedCards);
+            // Send cards back to client
+            const receiveCardsMsg: HostMessage = { type: 'RECEIVE_CARDS', payload: returnedCards };
+            connectionsRef.current[clientId]?.send(receiveCardsMsg);
+
+            updateStateAndBroadcast(prev => ({
+              ...prev,
+              deckCount: serverStateRef.current.deck.length,
+              players: {
+                ...prev.players,
+                [clientId]: {
+                  ...prev.players[clientId],
+                  handCount: serverStateRef.current.playerHands[clientId].length
+                }
+              },
+              eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'UNDO' as const, playerName: prev.players[clientId]?.name }]
+            }));
+            break;
+          }
         }
         break;
       }
@@ -288,7 +401,8 @@ export function useHost() {
             ...prev.players[playerId],
             handCount: serverStateRef.current.playerHands[playerId].length
           }
-        }
+        },
+        eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_DEAL' as const, playerName: prev.players[playerId]?.name, cards: [dealtCard] }]
       }));
     };
 
@@ -305,7 +419,8 @@ export function useHost() {
 
       updateStateAndBroadcast(prev => ({
         ...prev,
-        deckCount: serverStateRef.current.deck.length
+        deckCount: serverStateRef.current.deck.length,
+        eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_DRAW_TO_TABLE' as const, cards: [popped] }]
       }));
       callback(popped);
     };
@@ -318,7 +433,8 @@ export function useHost() {
 
       updateStateAndBroadcast(prev => ({
         ...prev,
-        deckCount: serverStateRef.current.deck.length
+        deckCount: serverStateRef.current.deck.length,
+        eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_RETURN_BATCH' as const, cards: [cardData] }]
       }));
     };
 
@@ -329,7 +445,8 @@ export function useHost() {
       updateStateAndBroadcast(prev => ({
         ...prev,
         deckCount: serverStateRef.current.deck.length,
-        playStack: [...prev.playStack, [drawnCard]]
+        playStack: [...prev.playStack, [drawnCard]],
+        eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_DRAW_TO_TABLE' as const, cards: [drawnCard] }]
       }));
     };
 
@@ -339,7 +456,8 @@ export function useHost() {
 
       updateStateAndBroadcast(prev => ({
         ...prev,
-        playStack: [...prev.playStack, [cardData]]
+        playStack: [...prev.playStack, [cardData]],
+        eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_DRAW_TO_TABLE' as const, cards: [cardData] }]
       }));
     };
 
@@ -362,7 +480,8 @@ export function useHost() {
         return {
           ...prev,
           deckCount: serverStateRef.current.deck.length,
-          playStack: newPlayStack
+          playStack: newPlayStack,
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_RETURN_BATCH' as const, cards: lastBatch }]
         };
       });
     };
@@ -376,7 +495,8 @@ export function useHost() {
         return {
           ...prev,
           playStack: [],
-          discardPile: [...prev.discardPile, ...flattenedStack]
+          discardPile: [...prev.discardPile, ...flattenedStack],
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const, cards: flattenedStack }]
         };
       });
     };
@@ -393,7 +513,8 @@ export function useHost() {
 
         return {
           ...prev,
-          playStack: newPlayStack
+          playStack: newPlayStack,
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_TAKE_FROM_TABLE' as const, cards: [cardData] }]
         };
       });
     };
@@ -403,11 +524,10 @@ export function useHost() {
       const { cardData } = customEvent.detail;
 
       updateStateAndBroadcast(prev => {
-        // Just push it to the end of the play stack as a new batch, or to the top batch.
-        // For simplicity, we can just append it as a new batch.
         return {
           ...prev,
-          playStack: [...prev.playStack, [cardData]]
+          playStack: [...prev.playStack, [cardData]],
+          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_RETURN_TO_TABLE' as const, cards: [cardData] }]
         };
       });
     };
@@ -428,7 +548,8 @@ export function useHost() {
 
       updateStateAndBroadcast(prev => ({
         ...prev,
-        discardPile: [...prev.discardPile, cardData]
+        discardPile: [...prev.discardPile, cardData],
+        eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'HOST_DISCARD' as const, cards: [cardData] }]
       }));
     };
 
@@ -482,6 +603,7 @@ export function useHost() {
           return { ...prev, players: newPlayers };
         });
         delete connectionsRef.current[conn.peer];
+        delete clientActionHistoryRef.current[conn.peer];
       });
     });
 

@@ -17,7 +17,8 @@
       "Bash(mv temp.tsx src/pages/Host.tsx)",
       "Bash(npx vite *)",
       "Bash(node *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(Get-Content *)"
     ]
   }
 }

@@ -10,6 +10,8 @@ export function useClient(hostId: string, playerName: string) {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [hand, setHand] = useState<Card[]>([]);
   const [peerId, setPeerId] = useState<string | null>(null);
+  const [undoableActionCount, setUndoableActionCount] = useState(0);
+  const undoableActionCountRef = useRef(0);
 
   const connRef = useRef<DataConnection | null>(null);
 
@@ -122,28 +124,39 @@ export function useClient(hostId: string, playerName: string) {
     }
   };
 
+  const trackAction = () => {
+    undoableActionCountRef.current += 1;
+    setUndoableActionCount(undoableActionCountRef.current);
+  };
+
   const drawCard = (count: number = 1) => {
+    trackAction();
     sendAction({ type: 'DRAW', payload: { count } });
   };
 
   const playCards = (cards: Card[]) => {
     // Optimistic UI update
     setHand(prev => prev.filter(c => !cards.map(sc => sc.id).includes(c.id)));
+    trackAction();
     sendAction({ type: 'PLAY', payload: { cards } });
   };
 
   const returnCards = (cards: Card[], toTop: boolean = true) => {
     setHand(prev => prev.filter(c => !cards.map(sc => sc.id).includes(c.id)));
+    trackAction();
     sendAction({ type: 'RETURN', payload: { cards, toTop } });
   };
 
-  const takeBackCards = (cards: Card[]) => {
-    // Reverts play action - server will send back cards
-    sendAction({ type: 'TAKE_BACK', payload: { cards } });
+  const drawFromOther = (targetPlayerId: string, cardId: string) => {
+    trackAction();
+    sendAction({ type: 'DRAW_FROM_OTHER', payload: { targetPlayerId, cardId } });
   };
 
-  const drawFromOther = (targetPlayerId: string, cardId: string) => {
-    sendAction({ type: 'DRAW_FROM_OTHER', payload: { targetPlayerId, cardId } });
+  const undoLastAction = () => {
+    if (undoableActionCountRef.current === 0) return;
+    undoableActionCountRef.current -= 1;
+    setUndoableActionCount(undoableActionCountRef.current);
+    sendAction({ type: 'UNDO_LAST_ACTION', payload: {} });
   };
 
   return {
@@ -153,10 +166,11 @@ export function useClient(hostId: string, playerName: string) {
     gameState,
     hand,
     peerId,
+    undoableActionCount,
     drawCard,
     playCards,
     returnCards,
-    takeBackCards,
     drawFromOther,
+    undoLastAction,
   };
 }

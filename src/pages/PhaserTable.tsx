@@ -1038,7 +1038,7 @@ export default function PhaserTable({ initialDeckCount = 0 }: { initialDeckCount
       parent: gameRef.current,
       width: '100%',
       height: '100%',
-      backgroundColor: '#065f46',
+      backgroundColor: '#07111f',
       physics: {
         default: 'matter',
         matter: {
