@@ -186,7 +186,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     drawFromOther,
     clearTable,
     undoLastAction,
-  } = useClient(hostId, playerName);
+  } = useClient(isPreview ? '' : hostId, playerName);
 
   const [localHand, setLocalHand] = useState<Card[]>(MOCK_HAND);
   const [localGameState, setLocalGameState] = useState<GameState>(MOCK_GAME_STATE);
@@ -203,10 +203,13 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
   const previewActionHistoryRef = useRef<{ type: string; payload: any }[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const playAreaRef = useRef<HTMLDivElement>(null);
+  const deckAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; pointerId: number; isDragging: boolean } | null>(null);
   const justPlayedRef = useRef(false);
   const [dragActive, setDragActive] = useState(false);
   const [dragOverPlayArea, setDragOverPlayArea] = useState(false);
+  const [dragOverReturnTopArea, setDragOverReturnTopArea] = useState(false);
+  const [dragOverReturnBottomArea, setDragOverReturnBottomArea] = useState(false);
   const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -412,13 +415,35 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     handleTakeBack();
   };
 
-  const checkPlayAreaHover = (x: number, y: number) => {
+  const checkDropZones = (x: number, y: number) => {
     if (playAreaRef.current) {
       const rect = playAreaRef.current.getBoundingClientRect();
       setDragOverPlayArea(
         x >= rect.left && x <= rect.right &&
         y >= rect.top && y <= rect.bottom
       );
+    } else {
+      setDragOverPlayArea(false);
+    }
+
+    if (deckAreaRef.current) {
+      const rect = deckAreaRef.current.getBoundingClientRect();
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        const midPoint = rect.left + rect.width / 2;
+        if (x < midPoint) {
+          setDragOverReturnTopArea(true);
+          setDragOverReturnBottomArea(false);
+        } else {
+          setDragOverReturnTopArea(false);
+          setDragOverReturnBottomArea(true);
+        }
+      } else {
+        setDragOverReturnTopArea(false);
+        setDragOverReturnBottomArea(false);
+      }
+    } else {
+      setDragOverReturnTopArea(false);
+      setDragOverReturnBottomArea(false);
     }
   };
 
@@ -466,7 +491,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
 
           if (dragRef.current.isDragging) {
             setDragPos({ x: e.clientX, y: e.clientY });
-            checkPlayAreaHover(e.clientX, e.clientY);
+            checkDropZones(e.clientX, e.clientY);
           }
         }}
         onPointerUp={(e) => {
@@ -476,9 +501,17 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
             if (dragOverPlayArea) {
               justPlayedRef.current = true;
               handlePlaySelected();
+            } else if (dragOverReturnTopArea) {
+              justPlayedRef.current = true;
+              handleReturnSelected(true);
+            } else if (dragOverReturnBottomArea) {
+              justPlayedRef.current = true;
+              handleReturnSelected(false);
             }
             setDragActive(false);
             setDragOverPlayArea(false);
+            setDragOverReturnTopArea(false);
+            setDragOverReturnBottomArea(false);
           }
 
           try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -889,17 +922,27 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
 
         {/* Deck & discard pile row */}
         {activeGameState && (
-          <div className="shrink-0 flex items-center gap-3 px-2">
+          <div ref={deckAreaRef} className="shrink-0 flex items-center gap-3 px-2">
             <button
               onClick={handleDrawAction}
               disabled={isDrawing}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/8 bg-slate-950/60 px-4 py-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50"
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 ${
+                dragActive && dragOverReturnTopArea
+                  ? 'border-amber-400/60 bg-amber-500/20 shadow-[0_0_40px_rgba(251,191,36,0.2)]'
+                  : 'border-white/8 bg-slate-950/60'
+              }`}
             >
               <div className="text-xs font-black text-white">{t(locale, dict, 'tableConfig.deck')}</div>
               <div className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-black text-white">{activeGameState.deckCount}</div>
             </button>
-            <div className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/8 bg-slate-950/60 px-4 py-2.5 shadow-lg">
-              <div className="text-xs font-black text-white">{t(locale, dict, 'tableConfig.discard')}</div>
+            <div
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 shadow-lg transition-all ${
+                dragActive && dragOverReturnBottomArea
+                  ? 'border-amber-400/60 bg-amber-500/20 shadow-[0_0_40px_rgba(251,191,36,0.2)]'
+                  : 'border-white/8 bg-slate-950/60'
+              }`}
+            >
+              <div className="text-xs font-black text-white">{t(locale, dict, 'host.returnBottom')}</div>
               <div className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-black text-white">{activeGameState.discardPile.length}</div>
             </div>
           </div>
@@ -936,31 +979,6 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
           )}
         </div>
 
-        {/* Play action bar for selected cards */}
-        {selectedCards.length > 0 && (
-          <div className="shrink-0 rounded-[1.5rem] border border-amber-300/25 bg-amber-400/10 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            <div className="flex items-center justify-center gap-3 text-center">
-              <button
-                onClick={() => handleReturnSelected(true)}
-                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/80 active:scale-[0.98] transition-all"
-              >
-                ← {t(locale, dict, 'client.swipeTop')}
-              </button>
-              <button
-                onClick={handlePlaySelected}
-                className="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-lg active:scale-[0.98] transition-all"
-              >
-                ↑ {t(locale, dict, 'client.swipePlay')}
-              </button>
-              <button
-                onClick={() => handleReturnSelected(false)}
-                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100/80 active:scale-[0.98] transition-all"
-              >
-                {t(locale, dict, 'client.swipeBottom')} →
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Event feed bar */}
