@@ -186,7 +186,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     drawFromOther,
     clearTable,
     undoLastAction,
-  } = useClient(hostId, playerName);
+  } = useClient(isPreview ? '' : hostId, playerName);
 
   const [localHand, setLocalHand] = useState<Card[]>(MOCK_HAND);
   const [localGameState, setLocalGameState] = useState<GameState>(MOCK_GAME_STATE);
@@ -942,7 +942,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
                   : 'border-white/8 bg-slate-950/60'
               }`}
             >
-              <div className="text-xs font-black text-white">{t(locale, dict, 'tableConfig.discard')}</div>
+              <div className="text-xs font-black text-white">{t(locale, dict, 'host.returnBottom')}</div>
               <div className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-black text-white">{activeGameState.discardPile.length}</div>
             </div>
           </div>
