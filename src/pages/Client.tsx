@@ -33,6 +33,16 @@ const MOCK_HAND: Card[] = [
   { id: 'mock-7', suit: 'none', rank: 'JOKER' },
 ];
 
+type PreviewActionHistoryEntry =
+  | { type: 'DRAW'; payload: { card: Card } }
+  | { type: 'PLAY'; payload: { cards: Card[] } }
+  | { type: 'RETURN'; payload: { cards: Card[] } }
+  | { type: 'DRAW_FROM_OTHER'; payload: { card: Card; targetPlayerId: string } };
+
+function eventTimestamp() {
+  return Date.now();
+}
+
 const MOCK_GAME_STATE: GameState = {
   deckCount: 42,
   discardPile: [],
@@ -190,7 +200,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
 
   const [localHand, setLocalHand] = useState<Card[]>(MOCK_HAND);
   const [localGameState, setLocalGameState] = useState<GameState>(MOCK_GAME_STATE);
-  const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const [selectedCardIds, setSelectedCards] = useState<string[]>([]);
   const [viewOther, setViewOther] = useState<string | null>(null);
   const [stolenCardResult, setStolenCardResult] = useState<Card | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -200,7 +210,8 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
   const [previewUndoCount, setPreviewUndoCount] = useState(0);
   const [showEventModal, setShowEventModal] = useState(false);
   const [localEventLog, setLocalEventLog] = useState<GameEvent[]>([]);
-  const previewActionHistoryRef = useRef<{ type: string; payload: any }[]>([]);
+  const previewActionHistoryRef = useRef<PreviewActionHistoryEntry[]>([]);
+  const previewCardIdRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const playAreaRef = useRef<HTMLDivElement>(null);
   const deckAreaRef = useRef<HTMLDivElement>(null);
@@ -260,10 +271,6 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     window.setTimeout(() => setToastMessage(null), 2200);
   };
 
-  useEffect(() => {
-    setSelectedCards(prev => prev.filter(id => hand.some(card => card.id === id)));
-  }, [hand]);
-
   const previousHandRef = useRef<Card[]>(hand);
   useEffect(() => {
     const previousHand = previousHandRef.current;
@@ -283,6 +290,11 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
   }, [hand, viewOther, locale]);
 
   const displayHand = useMemo(() => hand, [hand]);
+  const handCardIds = useMemo(() => new Set(hand.map(card => card.id)), [hand]);
+  const selectedCards = useMemo(
+    () => selectedCardIds.filter(id => handCardIds.has(id)),
+    [handCardIds, selectedCardIds],
+  );
 
   const toggleSelect = (cardId: string) => {
     setSelectedCards(prev => (prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]));
@@ -299,10 +311,11 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
 
     if (isPreview) {
       if (localGameState.deckCount > 0) {
-        const newCard: Card = { id: `mock-drawn-${Date.now()}`, suit: 'spades', rank: '7' };
+        previewCardIdRef.current += 1;
+        const newCard: Card = { id: `mock-drawn-${previewCardIdRef.current}`, suit: 'spades', rank: '7' };
         setLocalHand(prev => [...prev, newCard]);
         setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount - 1 }));
-        setLocalEventLog(prev => [...prev, { timestamp: Date.now(), type: 'DRAW', playerName, count: 1 }]);
+        setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'DRAW', playerName, count: 1 }]);
         previewActionHistoryRef.current.push({ type: 'DRAW', payload: { card: newCard } });
         setPreviewUndoCount(previewActionHistoryRef.current.length);
         showToast(t(locale, dict, 'client.drawnToast'));
@@ -327,7 +340,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
         ...prev,
         playStack: [...prev.playStack, cardsToPlay],
       }));
-      setLocalEventLog(prev => [...prev, { timestamp: Date.now(), type: 'PLAY', playerName, cards: cardsToPlay }]);
+      setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'PLAY', playerName, cards: cardsToPlay }]);
       previewActionHistoryRef.current.push({ type: 'PLAY', payload: { cards: cardsToPlay } });
       setPreviewUndoCount(previewActionHistoryRef.current.length);
       showToast(t(locale, dict, 'client.played', { n: String(cardsToPlay.length) }));
@@ -351,7 +364,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
         ...prev,
         deckCount: prev.deckCount + cardsToReturn.length,
       }));
-      setLocalEventLog(prev => [...prev, { timestamp: Date.now(), type: 'RETURN', playerName, cards: cardsToReturn }]);
+      setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'RETURN', playerName, cards: cardsToReturn }]);
       previewActionHistoryRef.current.push({ type: 'RETURN', payload: { cards: cardsToReturn } });
       setPreviewUndoCount(previewActionHistoryRef.current.length);
       showToast(toTop ? t(locale, dict, 'client.returnedTop') : t(locale, dict, 'client.returnedBottom'));
@@ -368,7 +381,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
       const lastAction = history.pop();
       if (!lastAction) return;
       setPreviewUndoCount(history.length);
-      setLocalEventLog(prev => [...prev, { timestamp: Date.now(), type: 'UNDO', playerName }]);
+      setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'UNDO', playerName }]);
 
       switch (lastAction.type) {
         case 'DRAW':
@@ -709,7 +722,8 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
                     playDrawSound();
 
                     if (isPreview) {
-                      const newCard: Card = { id: `mock-stolen-${Date.now()}`, suit: 'none', rank: 'JOKER' };
+                      previewCardIdRef.current += 1;
+                      const newCard: Card = { id: `mock-stolen-${previewCardIdRef.current}`, suit: 'none', rank: 'JOKER' };
                       setLocalHand(prev => [...prev, newCard]);
                       setLocalGameState(prev => {
                         const nextPlayers = { ...prev.players };
@@ -721,7 +735,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
                         }
                         return { ...prev, players: nextPlayers };
                       });
-                      setLocalEventLog(prev => [...prev, { timestamp: Date.now(), type: 'DRAW_FROM_OTHER', playerName, count: 1, targetPlayerName: targetPlayer.name }]);
+                      setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'DRAW_FROM_OTHER', playerName, count: 1, targetPlayerName: targetPlayer.name }]);
                       previewActionHistoryRef.current.push({
                         type: 'DRAW_FROM_OTHER',
                         payload: { card: newCard, targetPlayerId: viewOther }
@@ -859,7 +873,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
                             playStack: [],
                             discardPile: [...prev.discardPile, ...flattened],
                           }));
-                          setLocalEventLog(prev => [...prev, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const, cards: flattened }]);
+                          setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'HOST_CLEAR_TABLE' as const, cards: flattened }]);
                         } else {
                           clearTable();
                         }

@@ -2,6 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import Peer, { type DataConnection } from 'peerjs';
 import type { Card, GameState, ClientAction, HostMessage } from '../types';
 import { createDeck } from '../utils/deck';
+import { TABLE_EVENTS, emitTableEvent } from '../bridge/tableBridge';
+import { appendEvent, takeCardsFromHand } from '../state/cardFlows';
+
+type ClientActionHistoryEntry =
+  | { type: 'DRAW'; payload: { drawnCards: Card[] } }
+  | { type: 'PLAY'; payload: { cards: Card[] } }
+  | { type: 'DRAW_FROM_OTHER'; payload: { stolenCard: Card; targetPlayerId: string } }
+  | { type: 'RETURN'; payload: { cards: Card[]; toTop: boolean } };
 
 export function useHost() {
   const [status, setStatus] = useState<'starting' | 'ready' | 'failed' | 'reconnecting'>('starting');
@@ -65,7 +73,7 @@ export function useHost() {
       };
     });
 
-    window.dispatchEvent(new Event('table-reset'));
+    emitTableEvent(TABLE_EVENTS.reset);
   };
 
   // Keep true deck and hands server-side
@@ -75,7 +83,7 @@ export function useHost() {
   });
 
   // Per-client action history for undo
-  const clientActionHistoryRef = useRef<Record<string, { type: string; payload: any }[]>>({});
+  const clientActionHistoryRef = useRef<Record<string, ClientActionHistoryEntry[]>>({});
 
   // Track player name → peer ID mapping so reconnecting clients keep their identity
   const nameToPeerIdRef = useRef<Record<string, string>>({});
@@ -193,17 +201,14 @@ export function useHost() {
       case 'PLAY': {
         const { cards } = action.payload;
 
-        // Remove from server hand
-        const cardIds = cards.map(c => c.id);
-        serverStateRef.current.playerHands[clientId] = serverStateRef.current.playerHands[clientId].filter(
-          c => !cardIds.includes(c.id)
-        );
+        const playedCards = takeCardsFromHand(serverStateRef.current, clientId, cards);
+        if (playedCards.length === 0) break;
 
-        history[clientId].push({ type: 'PLAY', payload: { cards } });
+        history[clientId].push({ type: 'PLAY', payload: { cards: playedCards } });
 
-        updateStateAndBroadcast(prev => ({
+        updateStateAndBroadcast(prev => appendEvent({
           ...prev,
-          playStack: [...prev.playStack, cards],
+          playStack: [...prev.playStack, playedCards],
           players: {
             ...prev.players,
             [clientId]: {
@@ -211,28 +216,24 @@ export function useHost() {
               handCount: serverStateRef.current.playerHands[clientId].length
             }
           },
-          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'PLAY' as const, playerName: prev.players[clientId]?.name, cards }]
-        }));
+        }, { timestamp: Date.now(), type: 'PLAY' as const, playerName: prev.players[clientId]?.name, cards: playedCards }));
         break;
       }
       case 'RETURN': {
         const { cards, toTop } = action.payload;
 
-        // Remove from server hand
-        const returnCardIds = cards.map(c => c.id);
-        serverStateRef.current.playerHands[clientId] = serverStateRef.current.playerHands[clientId].filter(
-          c => !returnCardIds.includes(c.id)
-        );
+        const returnedCards = takeCardsFromHand(serverStateRef.current, clientId, cards);
+        if (returnedCards.length === 0) break;
 
         if (toTop) {
-          serverStateRef.current.deck.unshift(...cards);
+          serverStateRef.current.deck.unshift(...returnedCards);
         } else {
-          serverStateRef.current.deck.push(...cards);
+          serverStateRef.current.deck.push(...returnedCards);
         }
 
-        history[clientId].push({ type: 'RETURN', payload: { cards, toTop } });
+        history[clientId].push({ type: 'RETURN', payload: { cards: returnedCards, toTop } });
 
-        updateStateAndBroadcast(prev => ({
+        updateStateAndBroadcast(prev => appendEvent({
           ...prev,
           deckCount: serverStateRef.current.deck.length,
           players: {
@@ -242,8 +243,7 @@ export function useHost() {
               handCount: serverStateRef.current.playerHands[clientId].length
             }
           },
-          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'RETURN' as const, playerName: prev.players[clientId]?.name, cards }]
-        }));
+        }, { timestamp: Date.now(), type: 'RETURN' as const, playerName: prev.players[clientId]?.name, cards: returnedCards }));
         break;
       }
       case 'DRAW_FROM_OTHER': {
@@ -595,15 +595,15 @@ export function useHost() {
       });
     };
 
-    window.addEventListener('host-deal-card', handleHostDeal);
-    window.addEventListener('host-pop-card', handleHostPopCard);
-    window.addEventListener('host-return-popped-card', handleHostReturnPoppedCard);
-    window.addEventListener('host-draw-to-table', handleHostDrawToTable);
-    window.addEventListener('host-return-batch', handleHostReturnBatch);
-    window.addEventListener('host-clear-table', handleHostClearTable);
-    window.addEventListener('host-deal-to-table', handleHostDealToTable);
-    window.addEventListener('host-drag-public-card', handleHostDragPublicCard);
-    window.addEventListener('host-return-public-card', handleHostReturnPublicCard);
+    window.addEventListener(TABLE_EVENTS.hostDealCard, handleHostDeal);
+    window.addEventListener(TABLE_EVENTS.hostPopCard, handleHostPopCard);
+    window.addEventListener(TABLE_EVENTS.hostReturnPoppedCard, handleHostReturnPoppedCard);
+    window.addEventListener(TABLE_EVENTS.hostDrawToTable, handleHostDrawToTable);
+    window.addEventListener(TABLE_EVENTS.hostReturnBatch, handleHostReturnBatch);
+    window.addEventListener(TABLE_EVENTS.hostClearTable, handleHostClearTable);
+    window.addEventListener(TABLE_EVENTS.hostDealToTable, handleHostDealToTable);
+    window.addEventListener(TABLE_EVENTS.hostDragPublicCard, handleHostDragPublicCard);
+    window.addEventListener(TABLE_EVENTS.hostReturnPublicCard, handleHostReturnPublicCard);
 
     const handleHostDiscardCard = (e: Event) => {
       const customEvent = e as CustomEvent<{ cardData: Card }>;
@@ -616,19 +616,19 @@ export function useHost() {
       }));
     };
 
-    window.addEventListener('host-discard-card', handleHostDiscardCard);
+    window.addEventListener(TABLE_EVENTS.hostDiscardCard, handleHostDiscardCard);
 
     return () => {
-      window.removeEventListener('host-deal-card', handleHostDeal);
-      window.removeEventListener('host-pop-card', handleHostPopCard);
-      window.removeEventListener('host-return-popped-card', handleHostReturnPoppedCard);
-      window.removeEventListener('host-draw-to-table', handleHostDrawToTable);
-      window.removeEventListener('host-return-batch', handleHostReturnBatch);
-      window.removeEventListener('host-clear-table', handleHostClearTable);
-      window.removeEventListener('host-deal-to-table', handleHostDealToTable);
-      window.removeEventListener('host-drag-public-card', handleHostDragPublicCard);
-      window.removeEventListener('host-return-public-card', handleHostReturnPublicCard);
-      window.removeEventListener('host-discard-card', handleHostDiscardCard);
+      window.removeEventListener(TABLE_EVENTS.hostDealCard, handleHostDeal);
+      window.removeEventListener(TABLE_EVENTS.hostPopCard, handleHostPopCard);
+      window.removeEventListener(TABLE_EVENTS.hostReturnPoppedCard, handleHostReturnPoppedCard);
+      window.removeEventListener(TABLE_EVENTS.hostDrawToTable, handleHostDrawToTable);
+      window.removeEventListener(TABLE_EVENTS.hostReturnBatch, handleHostReturnBatch);
+      window.removeEventListener(TABLE_EVENTS.hostClearTable, handleHostClearTable);
+      window.removeEventListener(TABLE_EVENTS.hostDealToTable, handleHostDealToTable);
+      window.removeEventListener(TABLE_EVENTS.hostDragPublicCard, handleHostDragPublicCard);
+      window.removeEventListener(TABLE_EVENTS.hostReturnPublicCard, handleHostReturnPublicCard);
+      window.removeEventListener(TABLE_EVENTS.hostDiscardCard, handleHostDiscardCard);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

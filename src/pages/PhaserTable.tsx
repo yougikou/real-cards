@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 
-import type { Player } from '../types';
+import type { Card, Player } from '../types';
 import dict from '../i18n/translations';
 import type { Locale } from '../i18n/LocaleProvider';
+import { TABLE_EVENTS, emitTableEvent } from '../bridge/tableBridge';
 
 function getPhaserLocale(): Locale {
   if (typeof window === 'undefined') return 'en';
@@ -157,20 +158,20 @@ class TableScene extends Phaser.Scene {
       this.pendingDragStartPos = null;
       this.pendingDragPointerId = null;
     };
-    window.addEventListener('table-reset', onTableReset);
+    window.addEventListener(TABLE_EVENTS.reset, onTableReset);
 
     const onPlayersUpdated = (e: Event) => {
       const customEvent = e as CustomEvent<{ players: Record<string, Player> }>;
       this.connectedPlayers = Object.values(customEvent.detail.players);
       this.updateZoneLabels();
     };
-    window.addEventListener('players-updated', onPlayersUpdated);
+    window.addEventListener(TABLE_EVENTS.playersUpdated, onPlayersUpdated);
 
     const onPlayStackUpdated = (e: Event) => {
       const customEvent = e as CustomEvent<{ playStack: unknown[][] }>;
       this.updatePlayStack(customEvent.detail.playStack);
     };
-    window.addEventListener('play-stack-updated', onPlayStackUpdated);
+    window.addEventListener(TABLE_EVENTS.playStackUpdated, onPlayStackUpdated);
 
     const onDeckCountUpdated = (e: Event) => {
       const customEvent = e as CustomEvent<{ count: number }>;
@@ -178,7 +179,7 @@ class TableScene extends Phaser.Scene {
         this.deckCountText.setText(String(customEvent.detail.count));
       }
     };
-    window.addEventListener('deck-count-updated', onDeckCountUpdated);
+    window.addEventListener(TABLE_EVENTS.deckCountUpdated, onDeckCountUpdated);
 
     const onDiscardCountUpdated = (e: Event) => {
       const customEvent = e as CustomEvent<{ count: number; topCard?: { rank: string; suit: string } | null }>;
@@ -197,14 +198,14 @@ class TableScene extends Phaser.Scene {
       for (const s of this.discardEmptySprites) s.setVisible(count === 0);
       for (const s of this.discardSprites) s.setVisible(count > 0);
     };
-    window.addEventListener('discard-count-updated', onDiscardCountUpdated);
+    window.addEventListener(TABLE_EVENTS.discardCountUpdated, onDiscardCountUpdated);
 
     this.events.once('destroy', () => {
-      window.removeEventListener('table-reset', onTableReset);
-      window.removeEventListener('players-updated', onPlayersUpdated);
-      window.removeEventListener('play-stack-updated', onPlayStackUpdated);
-      window.removeEventListener('deck-count-updated', onDeckCountUpdated);
-      window.removeEventListener('discard-count-updated', onDiscardCountUpdated);
+      window.removeEventListener(TABLE_EVENTS.reset, onTableReset);
+      window.removeEventListener(TABLE_EVENTS.playersUpdated, onPlayersUpdated);
+      window.removeEventListener(TABLE_EVENTS.playStackUpdated, onPlayStackUpdated);
+      window.removeEventListener(TABLE_EVENTS.deckCountUpdated, onDeckCountUpdated);
+      window.removeEventListener(TABLE_EVENTS.discardCountUpdated, onDiscardCountUpdated);
     });
   }
 
@@ -673,9 +674,7 @@ class TableScene extends Phaser.Scene {
 
     // Remove all dragged cards from play stack state
     for (const c of cardSet.values()) {
-      window.dispatchEvent(new CustomEvent('host-drag-public-card', {
-        detail: { cardData: c, x: pointer.worldX, y: pointer.worldY }
-      }));
+      emitTableEvent(TABLE_EVENTS.hostDragPublicCard, { cardData: c as Card, x: pointer.worldX, y: pointer.worldY });
     }
 
     this.updatePlayStackSelectionVisuals();
@@ -777,13 +776,11 @@ class TableScene extends Phaser.Scene {
     if (!this.matter) return;
 
     let poppedCard: unknown = null;
-    window.dispatchEvent(new CustomEvent('host-pop-card', {
-      detail: {
-        callback: (card: unknown) => {
-          poppedCard = card;
-        }
-      }
-    }));
+    emitTableEvent(TABLE_EVENTS.hostPopCard, {
+      callback: (card: Card | null) => {
+        poppedCard = card;
+      },
+    });
 
     if (!poppedCard) return;
 
@@ -935,9 +932,7 @@ class TableScene extends Phaser.Scene {
                 onComplete: () => {
                     card.destroy();
                     for (const cd of allCardData) {
-                      window.dispatchEvent(new CustomEvent('host-deal-card', {
-                        detail: { playerId: targetZone!.mappedPlayerId, cardData: cd }
-                      }));
+                      emitTableEvent(TABLE_EVENTS.hostDealCard, { playerId: targetZone!.mappedPlayerId!, cardData: cd as Card });
                     }
                 }
             });
@@ -959,9 +954,7 @@ class TableScene extends Phaser.Scene {
                 onComplete: () => {
                     card.destroy();
                     for (const cd of allCardData) {
-                      window.dispatchEvent(new CustomEvent('host-discard-card', {
-                        detail: { cardData: cd }
-                      }));
+                      emitTableEvent(TABLE_EVENTS.hostDiscardCard, { cardData: cd as Card });
                     }
                 }
             });
@@ -984,9 +977,7 @@ class TableScene extends Phaser.Scene {
                 onComplete: () => {
                     card.destroy();
                     for (const cd of allCardData) {
-                      window.dispatchEvent(new CustomEvent('host-deal-to-table', {
-                        detail: { cardData: cd }
-                      }));
+                      emitTableEvent(TABLE_EVENTS.hostDealToTable, { cardData: cd as Card });
                     }
                 }
             });
@@ -994,7 +985,7 @@ class TableScene extends Phaser.Scene {
     } else {
         // Return to PUBLIC TABLE for play-stack cards, or deck for deck-drag cards
         const dragSource = (card as unknown as { dragSource?: string }).dragSource;
-        const returnEvent = dragSource === 'deck' ? 'host-return-popped-card' : 'host-return-public-card';
+        const returnEvent = dragSource === 'deck' ? TABLE_EVENTS.hostReturnPoppedCard : TABLE_EVENTS.hostReturnPublicCard;
 
         this.time.delayedCall(500, () => {
             if (!card.active) return;
@@ -1013,9 +1004,7 @@ class TableScene extends Phaser.Scene {
                 onComplete: () => {
                     card.destroy();
                     for (const cd of allCardData) {
-                      window.dispatchEvent(new CustomEvent(returnEvent, {
-                        detail: { cardData: cd }
-                      }));
+                      emitTableEvent(returnEvent, { cardData: cd as Card });
                     }
                 }
             });
@@ -1027,10 +1016,10 @@ class TableScene extends Phaser.Scene {
 export default function PhaserTable({ initialDeckCount = 0 }: { initialDeckCount?: number }) {
   const gameRef = useRef<HTMLDivElement>(null);
   const phaserGameRef = useRef<Phaser.Game | null>(null);
-
-  _initialDeckCount = initialDeckCount;
+  const initialDeckCountRef = useRef(initialDeckCount);
 
   useEffect(() => {
+    _initialDeckCount = initialDeckCountRef.current;
     if (!gameRef.current) return;
 
     const config: Phaser.Types.Core.GameConfig = {

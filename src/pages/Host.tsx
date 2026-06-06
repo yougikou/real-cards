@@ -6,6 +6,7 @@ import { playShuffleSound } from '../utils/audio/shuffle';
 import { useLocale, t } from '../i18n/LocaleProvider';
 import dict from '../i18n/translations';
 import type { Locale } from '../i18n/LocaleProvider';
+import { TABLE_EVENTS, emitTableEvent } from '../bridge/tableBridge';
 
 const STATUS_STYLES: Record<string, { panel: string; dot: string }> = {
   ready: {
@@ -56,27 +57,23 @@ export default function Host() {
     t(locale, dict, 'host.statusFailed');
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('players-updated', { detail: { players: gameState.players } }));
+    emitTableEvent(TABLE_EVENTS.playersUpdated, { players: gameState.players });
   }, [gameState.players]);
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('deck-count-updated', { detail: { count: gameState.deckCount } }));
+    emitTableEvent(TABLE_EVENTS.deckCountUpdated, { count: gameState.deckCount });
   }, [gameState.deckCount]);
 
   useEffect(() => {
     const topCard = gameState.discardPile.length > 0 ? gameState.discardPile[gameState.discardPile.length - 1] : null;
-    window.dispatchEvent(new CustomEvent('discard-count-updated', {
-      detail: {
-        count: gameState.discardPile.length,
-        topCard: topCard ? { rank: topCard.rank, suit: topCard.suit } : null,
-      }
-    }));
-  }, [gameState.discardPile.length]);
+    emitTableEvent(TABLE_EVENTS.discardCountUpdated, {
+      count: gameState.discardPile.length,
+      topCard: topCard ? { rank: topCard.rank, suit: topCard.suit } : null,
+    });
+  }, [gameState.discardPile]);
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('play-stack-updated', {
-      detail: { playStack: gameState.playStack }
-    }));
+    emitTableEvent(TABLE_EVENTS.playStackUpdated, { playStack: gameState.playStack });
   }, [gameState.playStack]);
 
   return (
@@ -209,7 +206,7 @@ export default function Host() {
           {gameState.playStack.flat().length > 0 && (
             <div className="pointer-events-auto absolute left-1/2 z-10 -translate-x-1/2" style={{ bottom: '22%' }}>
               <button
-                onClick={() => window.dispatchEvent(new CustomEvent('host-clear-table'))}
+                onClick={() => emitTableEvent(TABLE_EVENTS.hostClearTable)}
                 className="rounded-lg border border-rose-300/20 bg-rose-950/70 px-2.5 py-1.5 text-[11px] font-bold text-rose-200/90 shadow-[0_4px_16px_rgba(2,6,23,0.4)] transition-all hover:bg-rose-900/70 active:scale-95"
               >
                 {t(locale, dict, 'tableConfig.playStackAction')}
