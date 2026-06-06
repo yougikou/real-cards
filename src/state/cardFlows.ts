@@ -66,6 +66,154 @@ export function returnCardsToDeck(server: ServerCardState, cards: Card[], toTop:
   }
 }
 
+
+export function drawCardsToHand(server: ServerCardState, playerId: string, count: number): Card[] {
+  const cards = drawFromDeck(server, count);
+  if (cards.length === 0) return [];
+  if (!addCardsToHand(server, playerId, cards)) {
+    returnCardsToDeck(server, cards, true);
+    return [];
+  }
+  return cards;
+}
+
+export function moveCardsFromHandToDeck(
+  server: ServerCardState,
+  playerId: string,
+  cards: Card[],
+  toTop: boolean,
+): Card[] {
+  const movedCards = takeCardsFromHand(server, playerId, cards);
+  returnCardsToDeck(server, movedCards, toTop);
+  return movedCards;
+}
+
+export function moveCardBetweenHands(
+  server: ServerCardState,
+  fromPlayerId: string,
+  toPlayerId: string,
+  cardId?: string,
+): Card | null {
+  const sourceHand = server.playerHands[fromPlayerId];
+  const targetHand = server.playerHands[toPlayerId];
+  if (!sourceHand || !targetHand || sourceHand.length === 0) return null;
+
+  const cardIndex = cardId
+    ? sourceHand.findIndex(card => card.id === cardId)
+    : Math.floor(Math.random() * sourceHand.length);
+  if (cardIndex < 0) return null;
+
+  const [card] = sourceHand.splice(cardIndex, 1);
+  targetHand.push(card);
+  return card;
+}
+
+export function removeCardsFromPlayStack(state: GameState, cards: Card[]): GameState {
+  const cardIds = new Set(cards.map(card => card.id));
+  return {
+    ...state,
+    playStack: state.playStack
+      .map(batch => batch.filter(card => !cardIds.has(card.id)))
+      .filter(batch => batch.length > 0),
+  };
+}
+
+export function popPlayStackBatch(state: GameState): { nextState: GameState; cards: Card[] } {
+  if (state.playStack.length === 0) return { nextState: state, cards: [] };
+  const playStack = [...state.playStack];
+  const cards = playStack.pop() ?? [];
+  return {
+    nextState: {
+      ...state,
+      playStack,
+    },
+    cards,
+  };
+}
+
+export function appendPlayStackBatch(state: GameState, cards: Card[]): GameState {
+  if (cards.length === 0) return state;
+  return {
+    ...state,
+    playStack: [...state.playStack, cards],
+  };
+}
+
+
+export function moveCardsFromHandToPlayStack(
+  server: ServerCardState,
+  state: GameState,
+  playerId: string,
+  cards: Card[],
+): { nextState: GameState; cards: Card[] } {
+  const movedCards = takeCardsFromHand(server, playerId, cards);
+  return {
+    nextState: appendPlayStackBatch(state, movedCards),
+    cards: movedCards,
+  };
+}
+
+export function movePlayStackTopCardsToHand(
+  server: ServerCardState,
+  state: GameState,
+  playerId: string,
+  cards: Card[],
+): { nextState: GameState; cards: Card[] } {
+  if (cards.length === 0 || state.playStack.length === 0) {
+    return { nextState: state, cards: [] };
+  }
+
+  const requestedIds = new Set(cards.map(card => card.id));
+  const playStack = [...state.playStack];
+  const lastBatch = playStack.pop() ?? [];
+  const movedCards = cards.filter(card => lastBatch.some(stackCard => stackCard.id === card.id));
+
+  if (movedCards.length === 0) {
+    if (lastBatch.length > 0) playStack.push(lastBatch);
+    return { nextState: { ...state, playStack }, cards: [] };
+  }
+
+  addCardsToHand(server, playerId, movedCards);
+  const remainingBatch = lastBatch.filter(card => !requestedIds.has(card.id));
+  if (remainingBatch.length > 0) playStack.push(remainingBatch);
+
+  return {
+    nextState: {
+      ...state,
+      playStack,
+    },
+    cards: movedCards,
+  };
+}
+
+export function clearPlayStackToDiscard(state: GameState): { nextState: GameState; cards: Card[] } {
+  const cards = state.playStack.flat();
+  if (cards.length === 0) return { nextState: state, cards: [] };
+  return {
+    nextState: {
+      ...state,
+      playStack: [],
+      discardPile: [...state.discardPile, ...cards],
+    },
+    cards,
+  };
+}
+
+export function discardCards(state: GameState, cards: Card[]): GameState {
+  if (cards.length === 0) return state;
+  return {
+    ...state,
+    discardPile: [...state.discardPile, ...cards],
+  };
+}
+
+export function withPlayerHandCounts(state: GameState, server: ServerCardState, playerIds: string[]): GameState {
+  return playerIds.reduce(
+    (nextState, playerId) => withPlayerHandCount(nextState, server, playerId),
+    state,
+  );
+}
+
 export function removeCardsFromDeck(server: ServerCardState, cardIds: string[]): void {
   if (cardIds.length === 0) return;
   const idSet = new Set(cardIds);
