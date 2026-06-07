@@ -6,7 +6,7 @@ import { playShuffleSound } from '../utils/audio/shuffle';
 import { useLocale, t } from '../i18n/LocaleProvider';
 import dict from '../i18n/translations';
 import type { Locale } from '../i18n/LocaleProvider';
-import { emitTableSnapshot } from '../bridge/tableBridge';
+import { emitTableSnapshot, onHostCommand } from '../bridge/tableBridge';
 
 const STATUS_STYLES: Record<string, { panel: string; dot: string }> = {
   ready: {
@@ -38,7 +38,18 @@ function getStatusStyles(status: keyof typeof STATUS_STYLES) {
 }
 
 export default function Host() {
-  const { status, error, retry, peerId, gameState, resetGame, clearTableToDiscard } = useHost();
+  const {
+    status,
+    error,
+    retry,
+    peerId,
+    gameState,
+    resetGame,
+    clearTableToDiscard,
+    assignSeat,
+    approvePendingAction,
+    rejectPendingAction,
+  } = useHost();
   const { locale, setLocale } = useLocale();
 
   const joinUrl = useMemo(
@@ -49,12 +60,42 @@ export default function Host() {
   const statusStyles = getStatusStyles(status);
   const playerCount = Object.keys(gameState.players).length;
   const [panelOpen, setPanelOpen] = useState(true);
+  const [seatAssignmentPlayerId, setSeatAssignmentPlayerId] = useState<string | null>(null);
+  const hostPendingActions = Object.values(gameState.pendingActions).filter(action => action.confirmationMode === 'host');
+  const activeHostPendingAction = hostPendingActions[0];
 
   const statusLabel =
     status === 'ready' ? t(locale, dict, 'host.statusReady') :
     status === 'starting' ? t(locale, dict, 'host.statusStarting') :
     status === 'reconnecting' ? t(locale, dict, 'host.statusReconnecting') :
     t(locale, dict, 'host.statusFailed');
+
+  const latestEvent = gameState.eventLog[gameState.eventLog.length - 1];
+
+  const seatLabel = (seatId?: string) => {
+    if (!seatId) return t(locale, dict, 'host.unseated');
+    const parts = seatId.split('_');
+    return `${t(locale, dict, 'host.seat')} ${parts[1]} ${parts[2]}`;
+  };
+
+  const seatAssignmentPlayer = seatAssignmentPlayerId ? gameState.players[seatAssignmentPlayerId] : undefined;
+  const activeSeatAssignmentPlayerId = seatAssignmentPlayer ? seatAssignmentPlayerId : null;
+
+  const latestEventText = () => {
+    if (!latestEvent) return t(locale, dict, 'event.empty');
+    if (latestEvent.type === 'SEAT_ASSIGNED') {
+      return `${latestEvent.playerName ?? ''} -> ${seatLabel(latestEvent.seatId)}`;
+    }
+    return `${latestEvent.type}${latestEvent.playerName ? ` · ${latestEvent.playerName}` : ''}${latestEvent.count ? ` · ${latestEvent.count}` : ''}`;
+  };
+
+  const pendingActionText = () => {
+    if (!activeHostPendingAction) return '';
+    const requester = activeHostPendingAction.requestedByName ?? t(locale, dict, 'host.player');
+    return activeHostPendingAction.type === 'UNDO'
+      ? t(locale, dict, 'host.confirmUndoRequest', { name: requester })
+      : t(locale, dict, 'host.confirmMoveRequest', { name: requester });
+  };
 
   useEffect(() => {
     emitTableSnapshot('players', { players: gameState.players });
@@ -76,6 +117,17 @@ export default function Host() {
     emitTableSnapshot('playStack', { playStack: gameState.playStack });
   }, [gameState.playStack]);
 
+  useEffect(() => {
+    emitTableSnapshot('seatAssignmentMode', {
+      playerId: activeSeatAssignmentPlayerId,
+      playerName: seatAssignmentPlayer?.name,
+    });
+  }, [activeSeatAssignmentPlayerId, seatAssignmentPlayer?.name]);
+
+  useEffect(() => onHostCommand('assignPlayerToSeat', () => {
+    setSeatAssignmentPlayerId(null);
+  }), []);
+
   return (
     <div className="relative h-screen w-full overflow-hidden bg-[#07111f] text-white">
       <div className="absolute inset-0 z-0">
@@ -85,6 +137,31 @@ export default function Host() {
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.14),transparent_35%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.1),transparent_30%),linear-gradient(to_bottom,rgba(2,6,23,0.36),rgba(2,6,23,0.58))]" />
 
       <div className="pointer-events-none absolute inset-0 z-20 flex flex-col">
+
+        {activeHostPendingAction && (
+          <div className="pointer-events-auto absolute inset-0 z-[70] flex items-center justify-center bg-black/65 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl border border-amber-300/25 bg-slate-950 p-5 shadow-[0_28px_90px_rgba(0,0,0,0.62)]">
+              <div className="text-center">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.22em] text-amber-200">{t(locale, dict, 'host.tableConfirm')}</div>
+                <div className="mb-5 text-base font-black leading-relaxed text-white">{pendingActionText()}</div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => rejectPendingAction(activeHostPendingAction.id)}
+                    className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white transition-all active:scale-[0.98]"
+                  >
+                    {t(locale, dict, 'host.reject')}
+                  </button>
+                  <button
+                    onClick={() => approvePendingAction(activeHostPendingAction.id)}
+                    className="flex-1 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 transition-all active:scale-[0.98]"
+                  >
+                    {t(locale, dict, 'host.approve')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Centered modal for host panel (QR code, room info) */}
         {panelOpen && (
@@ -148,6 +225,71 @@ export default function Host() {
                   <div className="mt-3 rounded-2xl border border-white/20 bg-black/45 px-3 py-2 text-xs font-medium leading-relaxed text-white/80">
                     {status === 'failed' && error ? error : t(locale, dict, 'host.helper')}
                   </div>
+
+                  {playerCount > 0 && (
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/55">{t(locale, dict, 'host.seats')}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35">
+                          {gameState.moveLedger.length} {t(locale, dict, 'host.moves')}
+                        </div>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {Object.values(gameState.players).map(player => (
+                          <div
+                            key={player.id}
+                            className={`rounded-xl border p-2 transition-colors ${
+                              seatAssignmentPlayerId === player.id
+                                ? 'border-amber-300/55 bg-amber-400/10'
+                                : 'border-white/10 bg-black/30'
+                            }`}
+                          >
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate text-xs font-bold text-white">{player.name}</div>
+                                <div className={`text-[10px] font-semibold ${player.online === false ? 'text-amber-300' : 'text-emerald-300'}`}>
+                                  {player.online === false ? t(locale, dict, 'host.offline') : t(locale, dict, 'host.live')} · {player.handCount} {t(locale, dict, 'client.cards')}
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-[10px] font-semibold text-white/45">{seatLabel(player.seatId)}</div>
+                            </div>
+                            <div className="grid grid-cols-[1fr_auto] gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSeatAssignmentPlayerId(prev => prev === player.id ? null : player.id);
+                                  setPanelOpen(false);
+                                }}
+                                className={`rounded-lg px-2 py-1.5 text-xs font-black transition-all active:scale-[0.98] ${
+                                  seatAssignmentPlayerId === player.id
+                                    ? 'bg-amber-400 text-slate-950'
+                                    : 'border border-white/10 bg-slate-900 text-white'
+                                }`}
+                              >
+                                {seatAssignmentPlayerId === player.id ? t(locale, dict, 'host.cancelSeatAssign') : t(locale, dict, 'host.assignSeat')}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  assignSeat(player.id, undefined);
+                                  if (seatAssignmentPlayerId === player.id) setSeatAssignmentPlayerId(null);
+                                }}
+                                disabled={!player.seatId}
+                                className="rounded-lg border border-white/10 bg-slate-900 px-2 py-1.5 text-xs font-black text-white transition-all active:scale-[0.98] disabled:opacity-35"
+                              >
+                                {t(locale, dict, 'host.releaseSeat')}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {seatAssignmentPlayer && (
+                        <div className="mt-3 rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100">
+                          {t(locale, dict, 'host.seatAssignHint', { name: seatAssignmentPlayer.name })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -202,6 +344,17 @@ export default function Host() {
             <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-white/70">{t(locale, dict, 'host.players')}</span>
             <span className="text-xl font-bold text-white">{playerCount}</span>
           </div>
+
+          <div className="pointer-events-auto absolute left-1/2 top-2 z-10 w-[min(28rem,calc(100vw-8rem))] -translate-x-1/2 rounded-lg border border-white/15 bg-slate-950/80 px-3 py-2 text-center shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md">
+            <div className="truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">{t(locale, dict, 'host.latestMove')}</div>
+            <div className="truncate text-xs font-semibold text-white/85">{latestEventText()}</div>
+          </div>
+
+          {seatAssignmentPlayer && (
+            <div className="pointer-events-auto absolute left-1/2 top-20 z-10 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-amber-300/35 bg-amber-400 px-4 py-3 text-center text-sm font-black text-slate-950 shadow-[0_14px_34px_rgba(0,0,0,0.34)]">
+              {t(locale, dict, 'host.tapSeatForPlayer', { name: seatAssignmentPlayer.name })}
+            </div>
+          )}
 
 
 {/* Clear play stack - below center area */}

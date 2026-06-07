@@ -23,6 +23,7 @@ export interface TableBridgeEnvelope<
 }
 
 export interface HostCommandDetailMap {
+  assignPlayerToSeat: { playerId: string; seatId: string };
   dealCardToPlayer: { playerId: string; cardData?: Card };
   popDeckCardForDrag: { callback: (card: Card | null) => void };
   returnPoppedDeckCard: { cardData: Card };
@@ -37,6 +38,7 @@ export interface HostCommandDetailMap {
 
 export interface TableSnapshotDetailMap {
   reset: undefined;
+  seatAssignmentMode: { playerId: string | null; playerName?: string };
   players: { players: Record<string, Player> };
   deckCount: { count: number };
   discardPile: { count: number; topCard?: Pick<Card, 'rank' | 'suit'> | null };
