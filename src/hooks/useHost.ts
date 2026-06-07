@@ -11,6 +11,9 @@ import {
   discardCards,
   drawCardsToHand,
   drawFromDeck,
+  createPlayerHand,
+  getPlayerHand,
+  getPlayerHandCount,
   moveCardBetweenHands,
   moveCardsFromHandToDeck,
   moveCardsFromHandToPlayStack,
@@ -19,9 +22,12 @@ import {
   removeCardsFromDeck,
   removeCardsFromHand,
   removeCardsFromPlayStack,
+  resetPublicCardState,
+  resetServerCards,
   returnCardsToDeck,
   withDeckCount,
   withPlayerHandCount,
+  transferPlayerHand,
   withPlayerHandCounts,
 } from '../state/cardFlows';
 
@@ -62,35 +68,19 @@ export function useHost() {
   const connectionsRef = useRef<Record<string, DataConnection>>({});
 
   const resetGame = () => {
-    serverStateRef.current.deck = createDeck();
+    const removedCardIdsByPlayer = resetServerCards(serverStateRef.current, createDeck());
 
-    Object.keys(serverStateRef.current.playerHands).forEach(clientId => {
-      const hand = serverStateRef.current.playerHands[clientId];
-      if (hand.length > 0) {
-        const cardIds = hand.map(c => c.id);
+    for (const [clientId, cardIds] of Object.entries(removedCardIdsByPlayer)) {
+      if (cardIds.length > 0) {
         const msg: HostMessage = { type: 'REMOVE_CARDS', payload: cardIds };
         connectionsRef.current[clientId]?.send(msg);
       }
-      serverStateRef.current.playerHands[clientId] = [];
-    });
+    }
 
-    updateStateAndBroadcast(prev => {
-      const newPlayers = { ...prev.players };
-      Object.keys(newPlayers).forEach(clientId => {
-        newPlayers[clientId] = {
-          ...newPlayers[clientId],
-          handCount: 0
-        };
-      });
-
-      return appendEvent({
-        ...prev,
-        deckCount: serverStateRef.current.deck.length,
-        playStack: [],
-        discardPile: [],
-        players: newPlayers,
-      }, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const });
-    });
+    updateStateAndBroadcast(prev => appendEvent(
+      resetPublicCardState(prev, serverStateRef.current),
+      { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const },
+    ));
 
     emitTableEvent(TABLE_EVENTS.reset);
   };
@@ -143,26 +133,22 @@ export function useHost() {
             break;
           }
           // Reconnection: transfer server state from old peer ID to new
-          if (serverStateRef.current.playerHands[existingPeerId]) {
-            serverStateRef.current.playerHands[clientId] = serverStateRef.current.playerHands[existingPeerId];
-            delete serverStateRef.current.playerHands[existingPeerId];
-          }
+          transferPlayerHand(serverStateRef.current, existingPeerId, clientId);
           if (clientActionHistoryRef.current[existingPeerId]) {
             clientActionHistoryRef.current[clientId] = clientActionHistoryRef.current[existingPeerId];
             delete clientActionHistoryRef.current[existingPeerId];
           }
           nameToPeerIdRef.current[playerName] = clientId;
 
-          const existingHand = serverStateRef.current.playerHands[clientId] || [];
+          const existingHand = getPlayerHand(serverStateRef.current, clientId);
           updateStateAndBroadcast(prev => {
             const newPlayers = { ...prev.players };
             delete newPlayers[existingPeerId];
             newPlayers[clientId] = { id: clientId, name: playerName, handCount: existingHand.length };
-            return {
+            return appendEvent({
               ...prev,
               players: newPlayers,
-              eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'JOIN' as const, playerName }]
-            };
+            }, { timestamp: Date.now(), type: 'JOIN' as const, playerName });
           });
 
           // Send existing cards back to reconnecting client
@@ -180,15 +166,14 @@ export function useHost() {
         }
 
         nameToPeerIdRef.current[playerName] = clientId;
-        serverStateRef.current.playerHands[clientId] = [];
-        updateStateAndBroadcast(prev => ({
+        createPlayerHand(serverStateRef.current, clientId);
+        updateStateAndBroadcast(prev => appendEvent({
           ...prev,
           players: {
             ...prev.players,
-            [clientId]: { id: clientId, name: playerName, handCount: 0 }
+            [clientId]: { id: clientId, name: playerName, handCount: getPlayerHandCount(serverStateRef.current, clientId) }
           },
-          eventLog: [...prev.eventLog, { timestamp: Date.now(), type: 'JOIN' as const, playerName }]
-        }));
+        }, { timestamp: Date.now(), type: 'JOIN' as const, playerName }));
         break;
       }
       case 'DRAW': {

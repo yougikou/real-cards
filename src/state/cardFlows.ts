@@ -15,6 +15,67 @@ export function appendEvent(state: GameState, event: GameEvent): GameState {
   };
 }
 
+
+export function resetServerCards(server: ServerCardState, deck: Card[]): Record<string, string[]> {
+  server.deck = deck;
+  const removedCardIdsByPlayer: Record<string, string[]> = {};
+
+  for (const [playerId, hand] of Object.entries(server.playerHands)) {
+    removedCardIdsByPlayer[playerId] = hand.map(card => card.id);
+    server.playerHands[playerId] = [];
+  }
+
+  return removedCardIdsByPlayer;
+}
+
+export function createPlayerHand(server: ServerCardState, playerId: string): void {
+  server.playerHands[playerId] = server.playerHands[playerId] ?? [];
+}
+
+export function transferPlayerHand(server: ServerCardState, fromPlayerId: string, toPlayerId: string): Card[] {
+  const hand = server.playerHands[fromPlayerId] ?? [];
+  server.playerHands[toPlayerId] = hand;
+  delete server.playerHands[fromPlayerId];
+  return hand;
+}
+
+export function getPlayerHand(server: ServerCardState, playerId: string): Card[] {
+  return server.playerHands[playerId] ?? [];
+}
+
+export function getPlayerHandCount(server: ServerCardState, playerId: string): number {
+  return getPlayerHand(server, playerId).length;
+}
+
+export function replacePublicPlayersHandCounts(state: GameState, server: ServerCardState): GameState {
+  const players = Object.fromEntries(
+    Object.entries(state.players).map(([playerId, player]) => [
+      playerId,
+      {
+        ...player,
+        handCount: getPlayerHandCount(server, playerId),
+      },
+    ]),
+  );
+
+  return {
+    ...state,
+    players,
+  };
+}
+
+export function resetPublicCardState(state: GameState, server: ServerCardState): GameState {
+  return replacePublicPlayersHandCounts(
+    {
+      ...state,
+      deckCount: server.deck.length,
+      playStack: [],
+      discardPile: [],
+    },
+    server,
+  );
+}
+
 export function drawFromDeck(server: ServerCardState, count: number): Card[] {
   if (count <= 0 || server.deck.length === 0) return [];
   return server.deck.splice(0, count);
