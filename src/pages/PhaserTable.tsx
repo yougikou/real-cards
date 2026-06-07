@@ -50,12 +50,11 @@ class TableScene extends Phaser.Scene {
   private discardZoneRect: Phaser.GameObjects.Rectangle | null = null;
   private publicTableZone: Phaser.GameObjects.Rectangle | null = null;
 
-  private dragConstraint: MatterJS.ConstraintType | null = null;
   private dragCard: Phaser.Physics.Matter.Image | null = null;
   private dragShadow: Phaser.GameObjects.Image | null = null;
   private dragExtraImages: Phaser.GameObjects.Image[] = [];
   private activeDragPointerId: number | null = null;
-  private pointerBody: MatterJS.BodyType | null = null;
+  private dragPointerOffset = { x: 0, y: 0 };
   private locale: Locale = 'en';
 
   // Play stack multi-select + drag state
@@ -123,13 +122,6 @@ class TableScene extends Phaser.Scene {
     this.createPlayStack();
     this.createDiscardZone();
 
-    if (this.matter) {
-        this.pointerBody = this.matter.add.circle(0, 0, 5, {
-            isStatic: true,
-            isSensor: true
-        });
-    }
-
     this.setupInteractions();
 
     this.scale.on('resize', this.handleResize, this);
@@ -152,8 +144,8 @@ class TableScene extends Phaser.Scene {
         this.dragShadow = null;
         for (const img of this.dragExtraImages) img.destroy();
         this.dragExtraImages = [];
-        this.dragConstraint = null;
         this.activeDragPointerId = null;
+        this.dragPointerOffset = { x: 0, y: 0 };
         this.selectedPlayStackCards = [];
         this.pendingDragCard = null;
         this.pendingDragStartPos = null;
@@ -599,6 +591,27 @@ class TableScene extends Phaser.Scene {
     this.discardZoneRect = this.add.rectangle(width * 0.75, height * 0.78, 130, 170, 0xffffff, 0);
   }
 
+  private moveDragCardToPointer(pointer: Phaser.Input.Pointer) {
+    if (!this.dragCard) return;
+
+    const x = pointer.worldX + this.dragPointerOffset.x;
+    const y = pointer.worldY + this.dragPointerOffset.y;
+    this.dragCard.setPosition(x, y);
+    this.dragCard.setVelocity(0, 0);
+    this.dragCard.setAngularVelocity(0);
+
+    if (this.dragShadow) {
+      this.dragShadow.setPosition(x + 7, y + 9);
+    }
+
+    for (let i = 0; i < this.dragExtraImages.length; i++) {
+      const extra = this.dragExtraImages[i];
+      if (extra.active) {
+        extra.setPosition(x + (i + 1) * 8, y + (i + 1) * -6);
+      }
+    }
+  }
+
   private startPlayStackDrag(pointer: Phaser.Input.Pointer) {
     if (!this.matter || !this.pendingDragCard) return;
 
@@ -617,41 +630,31 @@ class TableScene extends Phaser.Scene {
     // Create Matter drag body BEFORE dispatching state removes
     const texKey = this.generateCardFaceTexture(clickedCard.rank, clickedCard.suit);
     const newCard = this.matter.add.image(startX, startY, texKey, undefined, {
-        mass: 0.1, friction: 0.1, frictionAir: 0.05, restitution: 0.2
+        mass: 0.35, friction: 0.18, frictionAir: 0.2, restitution: 0.05
     });
     Object.assign(newCard, { cardData: clickedCard });
     Object.assign(newCard, { dragSource: 'playStack' });
     Object.assign(newCard, { draggedCards: Array.from(cardSet.values()) });
-    newCard.setScale(1.1);
+    newCard.setScale(1.04);
     newCard.setDepth(100);
     this.dragCard = newCard;
     this.activeDragPointerId = pointer.id;
+    this.dragPointerOffset = { x: startX - pointer.worldX, y: startY - pointer.worldY };
 
     // Extra card visuals for multi-drag
     const extraCards = Array.from(cardSet.values()).filter(c => c.id !== clickedCard.id);
     this.dragExtraImages = [];
     for (let i = 0; i < Math.min(extraCards.length, 3); i++) {
       const eTex = this.generateCardFaceTexture(extraCards[i].rank, extraCards[i].suit);
-      const ei = this.add.image(startX + (i + 1) * 10, startY + (i + 1) * -8, eTex);
-      ei.setScale(1.05 - i * 0.02).setDepth(99 - i).setAlpha(0.9 - i * 0.1);
+      const ei = this.add.image(startX + (i + 1) * 8, startY + (i + 1) * -6, eTex);
+      ei.setScale(1.0 - i * 0.02).setDepth(99 - i).setAlpha(0.86 - i * 0.1);
       this.dragExtraImages.push(ei);
     }
 
     // Shadow
-    this.dragShadow = this.add.image(startX + 10, startY + 10, texKey);
-    this.dragShadow.setTint(0x000000).setAlpha(0.3).setScale(1.1).setDepth(99);
-
-    if (this.pointerBody) {
-         this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
-    }
-    if (this.pointerBody && newCard.body) {
-         this.dragConstraint = this.matter.add.constraint(
-            this.pointerBody,
-            newCard.body as MatterJS.BodyType,
-            0, 0.2,
-            { pointA: { x: 0, y: 0 }, pointB: { x: 0, y: 0 } }
-        );
-    }
+    this.dragShadow = this.add.image(startX + 7, startY + 9, texKey);
+    this.dragShadow.setTint(0x000000).setAlpha(0.22).setScale(1.04).setDepth(99);
+    this.moveDragCardToPointer(pointer);
 
     // Remove all dragged cards from play stack state
     for (const c of cardSet.values()) {
@@ -769,42 +772,27 @@ class TableScene extends Phaser.Scene {
     if (!poppedCard) return;
 
     const newCard = this.matter.add.image(startX, startY, 'cardBack', undefined, {
-        mass: 0.1,
-        friction: 0.1,
-        frictionAir: 0.05,
-        restitution: 0.2
+        mass: 0.35,
+        friction: 0.18,
+        frictionAir: 0.2,
+        restitution: 0.05
     });
 
     Object.assign(newCard, { cardData: poppedCard });
     Object.assign(newCard, { dragSource: 'deck' });
 
-    newCard.setScale(1.1);
+    newCard.setScale(1.04);
     newCard.setDepth(100);
     this.dragCard = newCard;
     this.activeDragPointerId = pointer.id;
+    this.dragPointerOffset = { x: startX - pointer.worldX, y: startY - pointer.worldY };
 
-    this.dragShadow = this.add.image(startX + 10, startY + 10, 'cardBack');
+    this.dragShadow = this.add.image(startX + 7, startY + 9, 'cardBack');
     this.dragShadow.setTint(0x000000);
-    this.dragShadow.setAlpha(0.3);
-    this.dragShadow.setScale(1.1);
+    this.dragShadow.setAlpha(0.22);
+    this.dragShadow.setScale(1.04);
     this.dragShadow.setDepth(99);
-
-    if (this.pointerBody) {
-         this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
-    }
-
-    if (this.pointerBody && newCard.body) {
-         this.dragConstraint = this.matter.add.constraint(
-            this.pointerBody,
-            newCard.body as MatterJS.BodyType,
-            0,
-            0.2,
-            {
-                pointA: { x: 0, y: 0 },
-                pointB: { x: 0, y: 0 }
-            }
-        );
-    }
+    this.moveDragCardToPointer(pointer);
 
     this.updateZoneLabels();
   }
@@ -825,18 +813,8 @@ class TableScene extends Phaser.Scene {
           }
         }
 
-        if (this.dragCard && this.pointerBody && this.dragConstraint && this.matter && isActiveDragPointer) {
-             this.matter.body.setPosition(this.pointerBody, { x: pointer.worldX, y: pointer.worldY });
-             if (this.dragShadow) {
-                 this.dragShadow.setPosition(this.dragCard.x + 15, this.dragCard.y + 15);
-             }
-             // Update extra drag card visuals
-             for (let i = 0; i < this.dragExtraImages.length; i++) {
-               const extra = this.dragExtraImages[i];
-               if (extra.active) {
-                 extra.setPosition(this.dragCard.x + (i + 1) * 10, this.dragCard.y + (i + 1) * -8);
-               }
-             }
+        if (this.dragCard && isActiveDragPointer) {
+             this.moveDragCardToPointer(pointer);
              this.updateZoneLabels();
         }
 
@@ -861,16 +839,13 @@ class TableScene extends Phaser.Scene {
              this.releaseCard(this.dragCard);
              this.dragCard = null;
              this.activeDragPointerId = null;
+             this.dragPointerOffset = { x: 0, y: 0 };
 
              if (this.dragShadow) {
                  this.dragShadow.destroy();
                  this.dragShadow = null;
              }
 
-             if (this.dragConstraint && this.matter && this.matter.world) {
-                 this.matter.world.removeConstraint(this.dragConstraint);
-                 this.dragConstraint = null;
-             }
              this.updateZoneLabels();
          }
     });

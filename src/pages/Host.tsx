@@ -82,16 +82,17 @@ export default function Host() {
         <PhaserTable initialDeckCount={gameState.deckCount} />
       </div>
 
-      <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.12),transparent_35%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.08),transparent_30%),linear-gradient(to_bottom,rgba(2,6,23,0.1),rgba(2,6,23,0.3))]" />
+      <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.14),transparent_35%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.1),transparent_30%),linear-gradient(to_bottom,rgba(2,6,23,0.36),rgba(2,6,23,0.58))]" />
 
       <div className="pointer-events-none absolute inset-0 z-20 flex flex-col">
 
         {/* Centered modal for host panel (QR code, room info) */}
         {panelOpen && (
-          <div className="pointer-events-auto absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setPanelOpen(false)}>
-            <div className="mx-4 w-full max-w-[32rem] overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-950/95 shadow-[0_24px_80px_rgba(2,6,23,0.45)] backdrop-blur-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="pointer-events-auto absolute inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-md" onClick={() => setPanelOpen(false)}>
+            <div className="mx-4 w-full max-w-[32rem] overflow-hidden rounded-[1.75rem] border border-white/20 bg-slate-950 shadow-[0_28px_90px_rgba(0,0,0,0.62)] backdrop-blur-xl" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setPanelOpen(false)}
+                aria-label={t(locale, dict, 'host.tableLabel')}
                 className="flex w-full items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-left transition-colors hover:bg-white/5"
               >
                 <div className="flex items-center gap-3">
@@ -99,16 +100,16 @@ export default function Host() {
                     <span className={`h-2.5 w-2.5 rounded-full ${statusStyles.dot}`} />
                   </div>
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.35em] text-white/45">{t(locale, dict, 'host.tableLabel')}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.35em] text-white/70">{t(locale, dict, 'host.tableLabel')}</div>
                     <div className="text-lg font-semibold text-white">{statusLabel}</div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.3em] text-white/60">
+                  <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/85">
                     {status === 'ready' ? t(locale, dict, 'host.live') : t(locale, dict, 'host.standby')}
                   </div>
-                  <span className="text-white/40">✕</span>
+                  <span className="text-white/70">✕</span>
                 </div>
               </button>
 
@@ -118,13 +119,13 @@ export default function Host() {
                     <QRCodeSVG value={joinUrl} size={104} />
                   </div>
                 ) : (
-                  <div className="flex h-[124px] w-[124px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-center text-xs font-medium uppercase tracking-[0.25em] text-white/35">
+                  <div className="flex h-[124px] w-[124px] items-center justify-center rounded-2xl border border-white/20 bg-slate-900/90 text-center text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
                     {t(locale, dict, 'host.waitingRoom')}
                   </div>
                 )}
 
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-white/65">
+                  <div className="text-sm font-medium text-white/85">
                     {status === 'ready' && peerId
                       ? t(locale, dict, 'host.scanHint')
                       : status === 'failed'
@@ -133,18 +134,18 @@ export default function Host() {
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/85">
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white/95">
                       {t(locale, dict, 'host.room')}: <span className="font-mono text-white">{peerId ? peerId.slice(0, 12) : '—'}</span>
                     </span>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/85">
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white/95">
                       {t(locale, dict, 'host.players')}: <span className="font-mono text-white">{playerCount}</span>
                     </span>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/85">
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white/95">
                       {t(locale, dict, 'host.deck')}: <span className="font-mono text-white">{gameState.deckCount}</span>
                     </span>
                   </div>
 
-                  <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-relaxed text-white/65">
+                  <div className="mt-3 rounded-2xl border border-white/20 bg-black/45 px-3 py-2 text-xs font-medium leading-relaxed text-white/80">
                     {status === 'failed' && error ? error : t(locale, dict, 'host.helper')}
                   </div>
                 </div>
@@ -168,8 +169,8 @@ export default function Host() {
                     onClick={(e) => { e.stopPropagation(); setLocale(code); }}
                     className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                       locale === code
-                        ? 'bg-white/20 text-white'
-                        : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
+                        ? 'border border-white/20 bg-white/20 text-white'
+                        : 'border border-white/10 bg-white/10 text-white/75 hover:bg-white/15 hover:text-white'
                     }`}
                   >
                     {label}
@@ -185,10 +186,11 @@ export default function Host() {
 
           {/* Host ready button - top left corner gap */}
           {!panelOpen && (
-            <div className="pointer-events-auto absolute left-0 top-0 z-10 flex h-14 w-14 items-center justify-center">
+            <div className="pointer-events-auto absolute left-2 top-2 z-10 flex h-14 w-14 items-center justify-center">
               <button
                 onClick={() => setPanelOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/70 shadow-[0_8px_32px_rgba(2,6,23,0.5)] backdrop-blur-xl transition-transform hover:scale-110 active:scale-95"
+                aria-label={t(locale, dict, 'host.tableLabel')}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-slate-950/85 shadow-[0_8px_32px_rgba(0,0,0,0.58)] backdrop-blur-xl transition-transform hover:scale-110 active:scale-95"
               >
                 <span className={`block h-2.5 w-2.5 rounded-full ${statusStyles.dot}`} />
               </button>
@@ -196,9 +198,9 @@ export default function Host() {
           )}
 
           {/* Player count - top right corner gap */}
-          <div className="pointer-events-auto absolute right-0 top-0 z-10 flex h-14 w-14 flex-col items-center justify-center gap-0">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.3em] text-white/45">{t(locale, dict, 'host.players')}</span>
-            <span className="text-lg font-semibold text-white/90">{playerCount}</span>
+          <div className="pointer-events-auto absolute right-2 top-2 z-10 flex min-w-16 flex-col items-center justify-center gap-0 rounded-lg border border-white/20 bg-slate-950/80 px-3 py-2 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md">
+            <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-white/70">{t(locale, dict, 'host.players')}</span>
+            <span className="text-xl font-bold text-white">{playerCount}</span>
           </div>
 
 
@@ -207,7 +209,7 @@ export default function Host() {
             <div className="pointer-events-auto absolute left-1/2 z-10 -translate-x-1/2" style={{ bottom: '22%' }}>
               <button
                 onClick={clearTableToDiscard}
-                className="rounded-lg border border-rose-300/20 bg-rose-950/70 px-2.5 py-1.5 text-[11px] font-bold text-rose-200/90 shadow-[0_4px_16px_rgba(2,6,23,0.4)] transition-all hover:bg-rose-900/70 active:scale-95"
+                className="rounded-lg border border-rose-200/35 bg-rose-950/90 px-3 py-2 text-xs font-bold text-rose-100 shadow-[0_8px_24px_rgba(0,0,0,0.48)] transition-all hover:bg-rose-900 active:scale-95"
               >
                 {t(locale, dict, 'tableConfig.playStackAction')}
               </button>
@@ -215,10 +217,11 @@ export default function Host() {
           )}
 
           {/* Reset shuffle - bottom left corner gap */}
-          <div className="pointer-events-auto absolute bottom-0 left-0 z-10 flex h-14 w-14 items-center justify-center">
+          <div className="pointer-events-auto absolute bottom-2 left-2 z-10 flex h-14 w-14 items-center justify-center">
             <button
               onClick={() => { resetGame(); playShuffleSound(); }}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-rose-300/30 bg-gradient-to-b from-rose-950/85 to-red-900/80 text-sm shadow-[0_8px_30px_rgba(2,6,23,0.35)] transition-transform hover:from-rose-900 hover:to-red-800 active:scale-95"
+              aria-label={t(locale, dict, 'host.resetShuffle')}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-rose-200/40 bg-gradient-to-b from-rose-950 to-red-900 text-base font-bold text-white shadow-[0_8px_30px_rgba(0,0,0,0.48)] transition-transform hover:from-rose-900 hover:to-red-800 active:scale-95"
             >
               ↺
             </button>
