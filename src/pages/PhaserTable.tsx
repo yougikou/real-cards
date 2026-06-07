@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import type { Card, Player } from '../types';
 import dict from '../i18n/translations';
 import type { Locale } from '../i18n/LocaleProvider';
-import { TABLE_EVENTS, emitTableEvent } from '../bridge/tableBridge';
+import { TABLE_EVENTS, emitTableEvent, onTableEvent } from '../bridge/tableBridge';
 
 function getPhaserLocale(): Locale {
   if (typeof window === 'undefined') return 'en';
@@ -134,78 +134,59 @@ class TableScene extends Phaser.Scene {
 
     this.scale.on('resize', this.handleResize, this);
 
-    const onTableReset = () => {
-      // Find and destroy all floating cards (both face up and face down)
-      const allCards = this.children.list.filter(
-        child => child instanceof Phaser.Physics.Matter.Image && child.texture && (child.texture.key === 'cardFront' || child.texture.key === 'cardBack' || child.texture.key.startsWith('cface_'))
-      ) as Phaser.Physics.Matter.Image[];
-      for (const card of allCards) {
-        // Do not destroy the static deck sprites
-        if (!card.isStatic()) {
-          card.destroy();
+    const cleanupTableEvents = [
+      onTableEvent(TABLE_EVENTS.reset, () => {
+        // Find and destroy all floating cards (both face up and face down)
+        const allCards = this.children.list.filter(
+          child => child instanceof Phaser.Physics.Matter.Image && child.texture && (child.texture.key === 'cardFront' || child.texture.key === 'cardBack' || child.texture.key.startsWith('cface_'))
+        ) as Phaser.Physics.Matter.Image[];
+        for (const card of allCards) {
+          // Do not destroy the static deck sprites
+          if (!card.isStatic()) {
+            card.destroy();
+          }
         }
-      }
 
-      this.dragCard = null;
-      this.dragShadow?.destroy();
-      this.dragShadow = null;
-      for (const img of this.dragExtraImages) img.destroy();
-      this.dragExtraImages = [];
-      this.dragConstraint = null;
-      this.activeDragPointerId = null;
-      this.selectedPlayStackCards = [];
-      this.pendingDragCard = null;
-      this.pendingDragStartPos = null;
-      this.pendingDragPointerId = null;
-    };
-    window.addEventListener(TABLE_EVENTS.reset, onTableReset);
-
-    const onPlayersUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<{ players: Record<string, Player> }>;
-      this.connectedPlayers = Object.values(customEvent.detail.players);
-      this.updateZoneLabels();
-    };
-    window.addEventListener(TABLE_EVENTS.playersUpdated, onPlayersUpdated);
-
-    const onPlayStackUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<{ playStack: unknown[][] }>;
-      this.updatePlayStack(customEvent.detail.playStack);
-    };
-    window.addEventListener(TABLE_EVENTS.playStackUpdated, onPlayStackUpdated);
-
-    const onDeckCountUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<{ count: number }>;
-      if (this.deckCountText) {
-        this.deckCountText.setText(String(customEvent.detail.count));
-      }
-    };
-    window.addEventListener(TABLE_EVENTS.deckCountUpdated, onDeckCountUpdated);
-
-    const onDiscardCountUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<{ count: number; topCard?: { rank: string; suit: string } | null }>;
-      const count = customEvent.detail.count;
-      const topCard = customEvent.detail.topCard;
-      if (this.discardCountText) {
-        this.discardCountText.setText(String(count));
-        this.discardCountText.setVisible(count > 0);
-      }
-      if (count > 0 && topCard) {
-        const texKey = this.generateCardFaceTexture(topCard.rank, topCard.suit);
-        for (const s of this.discardSprites) {
-          s.setTexture(texKey);
+        this.dragCard = null;
+        this.dragShadow?.destroy();
+        this.dragShadow = null;
+        for (const img of this.dragExtraImages) img.destroy();
+        this.dragExtraImages = [];
+        this.dragConstraint = null;
+        this.activeDragPointerId = null;
+        this.selectedPlayStackCards = [];
+        this.pendingDragCard = null;
+        this.pendingDragStartPos = null;
+        this.pendingDragPointerId = null;
+      }),
+      onTableEvent(TABLE_EVENTS.playersUpdated, ({ players }) => {
+        this.connectedPlayers = Object.values(players);
+        this.updateZoneLabels();
+      }),
+      onTableEvent(TABLE_EVENTS.playStackUpdated, ({ playStack }) => {
+        this.updatePlayStack(playStack);
+      }),
+      onTableEvent(TABLE_EVENTS.deckCountUpdated, ({ count }) => {
+        this.deckCountText?.setText(String(count));
+      }),
+      onTableEvent(TABLE_EVENTS.discardCountUpdated, ({ count, topCard }) => {
+        if (this.discardCountText) {
+          this.discardCountText.setText(String(count));
+          this.discardCountText.setVisible(count > 0);
         }
-      }
-      for (const s of this.discardEmptySprites) s.setVisible(count === 0);
-      for (const s of this.discardSprites) s.setVisible(count > 0);
-    };
-    window.addEventListener(TABLE_EVENTS.discardCountUpdated, onDiscardCountUpdated);
+        if (count > 0 && topCard) {
+          const texKey = this.generateCardFaceTexture(topCard.rank, topCard.suit);
+          for (const s of this.discardSprites) {
+            s.setTexture(texKey);
+          }
+        }
+        for (const s of this.discardEmptySprites) s.setVisible(count === 0);
+        for (const s of this.discardSprites) s.setVisible(count > 0);
+      }),
+    ];
 
     this.events.once('destroy', () => {
-      window.removeEventListener(TABLE_EVENTS.reset, onTableReset);
-      window.removeEventListener(TABLE_EVENTS.playersUpdated, onPlayersUpdated);
-      window.removeEventListener(TABLE_EVENTS.playStackUpdated, onPlayStackUpdated);
-      window.removeEventListener(TABLE_EVENTS.deckCountUpdated, onDeckCountUpdated);
-      window.removeEventListener(TABLE_EVENTS.discardCountUpdated, onDiscardCountUpdated);
+      for (const cleanup of cleanupTableEvents) cleanup();
     });
   }
 
