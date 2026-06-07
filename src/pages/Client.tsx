@@ -205,7 +205,7 @@ export default function Client() {
   return <ConnectedClient hostId={hostId!} playerName={playerName} isPreview={isPreview} />;
 }
 
-function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; playerName: string; isPreview: boolean }) {
+export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; playerName: string; isPreview: boolean }) {
   const [, setSearchParams] = useSearchParams();
   const { locale, setLocale } = useLocale();
 
@@ -247,9 +247,23 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
   const containerRef = useRef<HTMLDivElement>(null);
   const playAreaRef = useRef<HTMLDivElement>(null);
   const deckAreaRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ startX: number; startY: number; pointerId: number; isDragging: boolean } | null>(null);
+  const handScrollerRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    pointerId: number;
+    sourceCardId: string;
+    isDragging: boolean;
+    mode: 'pending' | 'action' | 'reorder' | 'select';
+    lastTargetCardId: string | null;
+    longPressTimer: number | null;
+  } | null>(null);
   const justPlayedRef = useRef(false);
   const [dragActive, setDragActive] = useState(false);
+  const [isReorderingHand, setIsReorderingHand] = useState(false);
+  const [multiSelectActive, setMultiSelectActive] = useState(false);
+  const [reorderTargetCardId, setReorderTargetCardId] = useState<string | null>(null);
   const [dragOverPlayArea, setDragOverPlayArea] = useState(false);
   const [dragOverReturnTopArea, setDragOverReturnTopArea] = useState(false);
   const [dragOverReturnBottomArea, setDragOverReturnBottomArea] = useState(false);
@@ -394,6 +408,85 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
 
   const toggleSelect = (cardId: string) => {
     setSelectedCards(prev => (prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]));
+  };
+
+  const clearLongPressTimer = () => {
+    if (dragRef.current?.longPressTimer) {
+      window.clearTimeout(dragRef.current.longPressTimer);
+      dragRef.current.longPressTimer = null;
+    }
+  };
+
+  const cardIdAtPoint = (x: number, y: number) => {
+    const element = document.elementFromPoint(x, y);
+    return element?.closest<HTMLElement>('[data-hand-card-id]')?.dataset.handCardId ?? null;
+  };
+
+  const selectRangeToCard = (sourceCardId: string, targetCardId: string) => {
+    const sourceIndex = displayHand.findIndex(card => card.id === sourceCardId);
+    const targetIndex = displayHand.findIndex(card => card.id === targetCardId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const start = Math.min(sourceIndex, targetIndex);
+    const end = Math.max(sourceIndex, targetIndex);
+    const rangeIds = displayHand.slice(start, end + 1).map(card => card.id);
+    setSelectedCards(prev => Array.from(new Set([...prev, ...rangeIds])));
+  };
+
+  const autoScrollHandAtEdge = (x: number) => {
+    const scroller = handScrollerRef.current;
+    if (!scroller) return;
+
+    const rect = scroller.getBoundingClientRect();
+    const edgeSize = 56;
+    if (x < rect.left + edgeSize) {
+      scroller.scrollLeft -= 18;
+    } else if (x > rect.right - edgeSize) {
+      scroller.scrollLeft += 18;
+    }
+  };
+
+  const reorderCardsAtPoint = (sourceCardId: string, x: number, y: number) => {
+    const dragState = dragRef.current;
+    autoScrollHandAtEdge(x);
+    const targetCardId = cardIdAtPoint(x, y);
+    if (!dragState || !targetCardId || targetCardId === sourceCardId || dragState.lastTargetCardId === targetCardId) return;
+
+    const selectedSet = new Set(selectedCards);
+    const movingIds = selectedSet.has(sourceCardId) ? selectedCards : [sourceCardId];
+    if (movingIds.includes(targetCardId)) return;
+
+    const targetElement = cardRefs.current[targetCardId];
+    const targetRect = targetElement?.getBoundingClientRect();
+    if (!targetRect) return;
+
+    const remaining = displayHand.filter(card => !movingIds.includes(card.id));
+    const movingCards = displayHand.filter(card => movingIds.includes(card.id));
+    const targetIndex = remaining.findIndex(card => card.id === targetCardId);
+    if (targetIndex < 0 || movingCards.length === 0) return;
+
+    const insertAfter = x > targetRect.left + targetRect.width / 2;
+    const insertIndex = targetIndex + (insertAfter ? 1 : 0);
+    const next = [
+      ...remaining.slice(0, insertIndex),
+      ...movingCards,
+      ...remaining.slice(insertIndex),
+    ];
+
+    dragState.lastTargetCardId = targetCardId;
+    setReorderTargetCardId(targetCardId);
+    applyHandOrder(next);
+  };
+
+  const resetHandDragState = () => {
+    clearLongPressTimer();
+    setDragActive(false);
+    setIsReorderingHand(false);
+    setReorderTargetCardId(null);
+    setDragOverPlayArea(false);
+    setDragOverReturnTopArea(false);
+    setDragOverReturnBottomArea(false);
+    dragRef.current = null;
   };
 
   const handleDrawAction = () => {
@@ -590,6 +683,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     const isSelected = selectedCards.includes(card.id);
     const hasSelection = selectedCards.length > 0;
     const isRecentlyDrawn = recentlyDrawnCardIds.includes(card.id);
+    const isReorderTarget = reorderTargetCardId === card.id;
     const tone = cardTone(card);
     const suitIcon = SUIT_SYMBOLS[card.suit];
     const spread = total > 1 ? (index / (total - 1)) * 2 - 1 : 0;
@@ -599,6 +693,10 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     return (
       <button
         key={card.id}
+        ref={(node) => {
+          cardRefs.current[card.id] = node;
+        }}
+        data-hand-card-id={card.id}
         type="button"
         onClick={(e) => {
           if (justPlayedRef.current) {
@@ -606,16 +704,30 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
             return;
           }
           e.stopPropagation();
+          if (dragRef.current) return;
+          setMultiSelectActive(false);
           toggleSelect(card.id);
         }}
         onPointerDown={(e) => {
-          if (!isSelected || !hasSelection) return;
+          if (e.button !== 0) return;
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          const longPressTimer = window.setTimeout(() => {
+            if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
+            dragRef.current.mode = 'select';
+            dragRef.current.isDragging = true;
+            setMultiSelectActive(true);
+            setSelectedCards(prev => (prev.includes(card.id) ? prev : [...prev, card.id]));
+            if (navigator.vibrate) navigator.vibrate(10);
+          }, 360);
           dragRef.current = {
             startX: e.clientX,
             startY: e.clientY,
             pointerId: e.pointerId,
+            sourceCardId: card.id,
             isDragging: false,
+            mode: 'pending',
+            lastTargetCardId: null,
+            longPressTimer,
           };
         }}
         onPointerMove={(e) => {
@@ -624,11 +736,31 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
           const dy = e.clientY - dragRef.current.startY;
 
           if (!dragRef.current.isDragging && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+            clearLongPressTimer();
             dragRef.current.isDragging = true;
-            setDragActive(true);
+            if (isSelected && hasSelection && Math.abs(dy) > Math.abs(dx) + 8) {
+              dragRef.current.mode = 'action';
+              setDragActive(true);
+            } else {
+              dragRef.current.mode = 'reorder';
+              setIsReorderingHand(true);
+              setSelectedCards(prev => (prev.includes(card.id) ? prev : [card.id]));
+            }
           }
 
-          if (dragRef.current.isDragging) {
+          if (dragRef.current.mode === 'select') {
+            autoScrollHandAtEdge(e.clientX);
+            const targetCardId = cardIdAtPoint(e.clientX, e.clientY);
+            if (targetCardId) selectRangeToCard(dragRef.current.sourceCardId, targetCardId);
+            return;
+          }
+
+          if (dragRef.current.mode === 'reorder') {
+            reorderCardsAtPoint(dragRef.current.sourceCardId, e.clientX, e.clientY);
+            return;
+          }
+
+          if (dragRef.current.mode === 'action') {
             setDragPos({ x: e.clientX, y: e.clientY });
             checkDropZones(e.clientX, e.clientY);
           }
@@ -636,7 +768,9 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
         onPointerUp={(e) => {
           if (!dragRef.current) return;
 
-          if (dragRef.current.isDragging) {
+          clearLongPressTimer();
+
+          if (dragRef.current.mode === 'action' && dragRef.current.isDragging) {
             if (dragOverPlayArea) {
               justPlayedRef.current = true;
               handlePlaySelected();
@@ -647,16 +781,23 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
               justPlayedRef.current = true;
               handleReturnSelected(false);
             }
-            setDragActive(false);
-            setDragOverPlayArea(false);
-            setDragOverReturnTopArea(false);
-            setDragOverReturnBottomArea(false);
+          } else if (dragRef.current.mode === 'select') {
+            const targetCardId = cardIdAtPoint(e.clientX, e.clientY);
+            if (targetCardId) selectRangeToCard(dragRef.current.sourceCardId, targetCardId);
+            justPlayedRef.current = true;
+          } else if (dragRef.current.mode === 'reorder') {
+            reorderCardsAtPoint(dragRef.current.sourceCardId, e.clientX, e.clientY);
+            justPlayedRef.current = true;
           }
 
           try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-          dragRef.current = null;
+          resetHandDragState();
         }}
-        className={`relative w-24 h-36 rounded-[0.625rem] bg-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] border border-slate-300 flex flex-col justify-between p-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-400/80 ${isSelected ? 'ring-4 ring-amber-400 z-30' : ''} ${hasSelection && !isSelected ? 'opacity-60 saturate-50' : ''} ${isRecentlyDrawn ? 'ring-4 ring-emerald-400 shadow-[0_0_24px_rgba(34,197,94,0.45)] z-20' : ''} ${dragActive && isSelected ? 'opacity-40 scale-95' : ''}`}
+        onPointerCancel={(e) => {
+          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+          resetHandDragState();
+        }}
+        className={`relative w-24 h-36 rounded-[0.625rem] bg-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] border border-slate-300 flex flex-col justify-between p-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-400/80 touch-none ${isSelected ? 'ring-4 ring-amber-400 z-30' : ''} ${hasSelection && !isSelected ? 'opacity-60 saturate-50' : ''} ${isRecentlyDrawn ? 'ring-4 ring-emerald-400 shadow-[0_0_24px_rgba(34,197,94,0.45)] z-20' : ''} ${dragActive && isSelected ? 'opacity-40 scale-95' : ''} ${isReorderingHand && isSelected ? 'shadow-[0_0_28px_rgba(251,191,36,0.45)]' : ''} ${isReorderTarget ? 'outline outline-2 outline-cyan-300 outline-offset-4' : ''}`}
         style={{
           transform: `translateY(${fanLift + (isSelected ? -18 : 0)}px) rotate(${fanTilt}deg) scale(${isSelected ? 1.06 : hasSelection ? 0.96 : 1})`,
           zIndex: isSelected ? 40 : 10 + index,
@@ -790,6 +931,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
 
   const targetPlayer = viewOther && activeGameState ? activeGameState.players[viewOther] : null;
   const targetActionPlayer = targetActionPlayerId && activeGameState ? activeGameState.players[targetActionPlayerId] : null;
+  const handOverlap = displayHand.length >= 25 ? -72 : displayHand.length >= 20 ? -64 : displayHand.length >= 14 ? -52 : -24;
 
   if (viewOther && targetPlayer) {
     return (
@@ -1166,6 +1308,11 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
           <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-1">
             <div>
               <div className="text-xs text-white/60">{t(locale, dict, 'client.yourHand')}</div>
+              {(selectedCards.length > 0 || multiSelectActive) && (
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200/80">
+                  {selectedCards.length} {t(locale, dict, 'client.selected')}
+                </div>
+              )}
             </div>
             <div className="flex max-w-[75%] flex-wrap items-center justify-end gap-1">
               <button
@@ -1221,10 +1368,14 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
           </div>
 
           {hand.length > 0 ? (
-            <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 touch-pan-x">
-              <div className="flex h-full items-end gap-0 px-1 py-2">
+            <div ref={handScrollerRef} className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 touch-pan-x">
+              <div className="flex h-full min-w-max items-end gap-0 px-2 py-2">
                 {displayHand.map((card, index) => (
-                  <div key={card.id} className="-ml-6 first:ml-0 first:pl-0" style={{ zIndex: index + 1 }}>
+                  <div
+                    key={card.id}
+                    className="first:ml-0 first:pl-0"
+                    style={{ marginLeft: index === 0 ? 0 : handOverlap, zIndex: index + 1 }}
+                  >
                     {renderCard(card, index, displayHand.length)}
                   </div>
                 ))}

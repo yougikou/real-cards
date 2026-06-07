@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useSearchParams } from 'react-router-dom';
 import { useHost } from '../hooks/useHost';
 import PhaserTable from './PhaserTable';
+import PhoneHost from './PhoneHost';
 import { playShuffleSound } from '../utils/audio/shuffle';
 import { useLocale, t } from '../i18n/LocaleProvider';
 import dict from '../i18n/translations';
@@ -38,6 +40,24 @@ function getStatusStyles(status: keyof typeof STATUS_STYLES) {
 }
 
 export default function Host() {
+  const [searchParams] = useSearchParams();
+  const [useCompactHost] = useState(shouldUseCompactHostDefault);
+  const forcedDesktop = searchParams.get('desktop') === 'true';
+  const forcedPhone = searchParams.get('phone') === 'true';
+
+  if ((useCompactHost && !forcedDesktop) || forcedPhone) {
+    return <PhoneHost />;
+  }
+
+  return <DesktopHost />;
+}
+
+function shouldUseCompactHostDefault() {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth < 900 || window.innerHeight < 620;
+}
+
+function DesktopHost() {
   const {
     status,
     error,

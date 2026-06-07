@@ -22,6 +22,9 @@ const dict: Translations = {
     'home.signalClient': '手机手牌',
     'home.signalSandbox': '自由沙盒',
     'home.createHint': '打开公共桌面，展示二维码，玩家扫码入局。',
+    'home.phoneHost': '没有大屏也能开局',
+    'home.createPhoneHost': '手机开局',
+    'home.phoneHostHint': '这台手机同时当房主和玩家，其他玩家照常加入。',
 
     'host.statusReady': '主机就绪',
     'host.statusStarting': '正在启动',
@@ -71,6 +74,15 @@ const dict: Translations = {
     'host.releaseSeat': '释放',
     'host.seatAssignHint': '正在为 {name} 分配座位。关闭面板后点击桌边座位，已占座会自动交换。',
     'host.tapSeatForPlayer': '点击桌边座位，为 {name} 入座或交换座位',
+
+    'phoneHost.mode': '手机房主',
+    'phoneHost.nameTitle': '先加入自己的房间',
+    'phoneHost.startAsPlayer': '作为房主玩家开始',
+    'phoneHost.hostControls': '房主管理',
+    'phoneHost.shareHint': '其他玩家扫码或输入房间号加入。',
+    'phoneHost.dealOne': '发 1 张',
+    'phoneHost.chooseSeat': '为 {name} 选择座位',
+    'phoneHost.resetConfirm': '确定要重置整局并重新洗牌吗？',
 
     'client.preview': '预览',
     'client.connectionFailed': '连接失败',
@@ -213,6 +225,9 @@ const dict: Translations = {
     'home.signalClient': 'スマホ手札',
     'home.signalSandbox': '自由サンドボックス',
     'home.createHint': '公開テーブルを開き、QRを表示してプレイヤーを招待。',
+    'home.phoneHost': '大画面なしで開始',
+    'home.createPhoneHost': 'スマホで開始',
+    'home.phoneHostHint': 'このスマホがホスト兼プレイヤーになり、他のプレイヤーも参加できます。',
 
     'host.statusReady': 'ホスト準備完了',
     'host.statusStarting': '起動中',
@@ -262,6 +277,15 @@ const dict: Translations = {
     'host.releaseSeat': '解除',
     'host.seatAssignHint': '{name} の席を割り当て中。パネルを閉じてテーブル端の席をタップ。使用中の席は自動で交換されます。',
     'host.tapSeatForPlayer': 'テーブル端の席をタップして {name} を着席または交換',
+
+    'phoneHost.mode': 'スマホホスト',
+    'phoneHost.nameTitle': '自分のルームに参加',
+    'phoneHost.startAsPlayer': 'ホストプレイヤーとして開始',
+    'phoneHost.hostControls': 'ホスト管理',
+    'phoneHost.shareHint': '他のプレイヤーはQRまたはルームIDで参加。',
+    'phoneHost.dealOne': '1枚配る',
+    'phoneHost.chooseSeat': '{name} の席を選択',
+    'phoneHost.resetConfirm': 'ゲーム全体をリセットしてシャッフルしますか？',
 
     'client.preview': 'プレビュー',
     'client.connectionFailed': '接続失敗',
@@ -404,6 +428,9 @@ const dict: Translations = {
     'home.signalClient': 'Phone hands',
     'home.signalSandbox': 'Free sandbox',
     'home.createHint': 'Open the public table, show the QR code, and let players join.',
+    'home.phoneHost': 'Start without a big screen',
+    'home.createPhoneHost': 'Start on Phone',
+    'home.phoneHostHint': 'This phone acts as both host and player while others join normally.',
 
     'host.statusReady': 'Host Ready',
     'host.statusStarting': 'Starting Host',
@@ -453,6 +480,15 @@ const dict: Translations = {
     'host.releaseSeat': 'Release',
     'host.seatAssignHint': 'Assigning a seat for {name}. Close this panel and tap a table-edge seat; occupied seats swap automatically.',
     'host.tapSeatForPlayer': 'Tap a table-edge seat to seat or swap {name}',
+
+    'phoneHost.mode': 'Phone Host',
+    'phoneHost.nameTitle': 'Join your own room first',
+    'phoneHost.startAsPlayer': 'Start as host player',
+    'phoneHost.hostControls': 'Host Controls',
+    'phoneHost.shareHint': 'Other players can scan or enter this room ID.',
+    'phoneHost.dealOne': 'Deal 1',
+    'phoneHost.chooseSeat': 'Choose a seat for {name}',
+    'phoneHost.resetConfirm': 'Reset the whole game and shuffle again?',
 
     'client.preview': 'Preview',
     'client.connectionFailed': 'Connection Failed',
