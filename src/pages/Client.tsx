@@ -23,6 +23,31 @@ const SUIT_SYMBOLS: Record<Suit, string> = {
   none: '🃏',
 };
 
+const SUIT_ORDER: Record<Suit, number> = {
+  spades: 0,
+  hearts: 1,
+  clubs: 2,
+  diamonds: 3,
+  none: 4,
+};
+
+const RANK_ORDER: Record<Card['rank'], number> = {
+  A: 0,
+  '2': 1,
+  '3': 2,
+  '4': 3,
+  '5': 4,
+  '6': 5,
+  '7': 6,
+  '8': 7,
+  '9': 8,
+  '10': 9,
+  J: 10,
+  Q: 11,
+  K: 12,
+  JOKER: 13,
+};
+
 const MOCK_HAND: Card[] = [
   { id: 'mock-1', suit: 'spades', rank: 'A' },
   { id: 'mock-2', suit: 'hearts', rank: 'K' },
@@ -54,10 +79,12 @@ const MOCK_GAME_STATE: GameState = {
     ],
   ],
   players: {
-    'mock-peer-1': { id: 'mock-peer-1', name: 'Alice', handCount: 5 },
-    'mock-peer-2': { id: 'mock-peer-2', name: 'Bob', handCount: 3 },
+    'mock-peer-1': { id: 'mock-peer-1', name: 'Alice', handCount: 5, seatId: 'player_top_1', online: true },
+    'mock-peer-2': { id: 'mock-peer-2', name: 'Bob', handCount: 3, seatId: 'player_right_1', online: true },
   },
   eventLog: [],
+  moveLedger: [],
+  pendingActions: {},
 };
 
 function isRedSuit(suit: Suit) {
@@ -189,19 +216,24 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     gameState: realGameState,
     hand: realHand,
     peerId,
+    pendingConfirmations,
     undoableActionCount,
     drawCard,
     playCards,
     returnCards,
     drawFromOther,
+    giveCards,
     clearTable,
     undoLastAction,
+    reorderHand,
+    respondToPendingAction,
   } = useClient(isPreview ? '' : hostId, playerName);
 
   const [localHand, setLocalHand] = useState<Card[]>(MOCK_HAND);
   const [localGameState, setLocalGameState] = useState<GameState>(MOCK_GAME_STATE);
   const [selectedCardIds, setSelectedCards] = useState<string[]>([]);
   const [viewOther, setViewOther] = useState<string | null>(null);
+  const [targetActionPlayerId, setTargetActionPlayerId] = useState<string | null>(null);
   const [stolenCardResult, setStolenCardResult] = useState<Card | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [recentlyDrawnCardIds, setRecentlyDrawnCardIds] = useState<string[]>([]);
@@ -237,6 +269,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
   const hand = isPreview ? localHand : realHand;
   const activeGameState = isPreview ? localGameState : realGameState;
   const eventLog = isPreview ? localEventLog : (activeGameState?.eventLog || []);
+  const activePendingConfirmation = isPreview ? null : pendingConfirmations[0] ?? null;
 
   const andMoreTpl = t(locale, dict, 'event.andMore');
 
@@ -252,6 +285,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
       case 'PLAY': return t(locale, dict, 'event.played', { player: pn, cards: cardStr });
       case 'RETURN': return t(locale, dict, 'event.returned', { player: pn, cards: cardStr });
       case 'DRAW_FROM_OTHER': return t(locale, dict, 'event.drewFromOther', { player: pn, target });
+      case 'GIVE_CARD': return t(locale, dict, 'event.gaveCard', { player: pn, target, cards: cardStr });
       case 'UNDO': return t(locale, dict, 'event.undone', { player: pn });
       case 'HOST_DRAW_TO_TABLE': return t(locale, dict, 'event.hostDrewToTable', { cards: cardStr });
       case 'HOST_DEAL': return t(locale, dict, 'event.hostDealt', { player: pn, cards: cardStr });
@@ -262,6 +296,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
       case 'HOST_DISCARD': return t(locale, dict, 'event.hostDiscarded', { cards: cardStr });
       case 'HOST_TAKE_FROM_TABLE': return t(locale, dict, 'event.hostTakenFromTable', { cards: cardStr });
       case 'HOST_RETURN_TO_TABLE': return t(locale, dict, 'event.hostReturnedToTable', { cards: cardStr });
+      case 'SEAT_ASSIGNED': return t(locale, dict, 'event.seatAssigned', { player: pn, seat: event.seatId || t(locale, dict, 'host.unseated') });
       default: return '';
     }
   };
@@ -271,10 +306,32 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     window.setTimeout(() => setToastMessage(null), 2200);
   };
 
+  const pendingConfirmationText = () => {
+    if (!activePendingConfirmation) return '';
+    if (activePendingConfirmation.type === 'UNDO') {
+      return t(locale, dict, 'client.confirmUndoForPlayer', { name: activePendingConfirmation.requestedByName || '' });
+    }
+    if (activePendingConfirmation.move?.action === 'GIVE_CARD') {
+      return t(locale, dict, 'client.confirmReceiveCards', {
+        name: activePendingConfirmation.requestedByName || '',
+        n: String(activePendingConfirmation.move.cards.length),
+      });
+    }
+    return t(locale, dict, 'client.confirmTakeFromHand', { name: activePendingConfirmation.requestedByName || '' });
+  };
+
+  const handOrderRef = useRef<Record<string, number>>({});
+  const nextHandOrderRef = useRef(0);
   const previousHandRef = useRef<Card[]>(hand);
   useEffect(() => {
     const previousHand = previousHandRef.current;
     const newCards = hand.filter(card => !previousHand.some(prev => prev.id === card.id));
+    for (const card of hand) {
+      if (handOrderRef.current[card.id] === undefined) {
+        handOrderRef.current[card.id] = nextHandOrderRef.current;
+        nextHandOrderRef.current += 1;
+      }
+    }
 
     if (newCards.length > 0 && !viewOther) {
       const newCardIds = newCards.map(card => card.id);
@@ -295,6 +352,45 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     () => selectedCardIds.filter(id => handCardIds.has(id)),
     [handCardIds, selectedCardIds],
   );
+
+  const applyHandOrder = (cards: Card[]) => {
+    if (isPreview) {
+      setLocalHand(cards);
+      return;
+    }
+    reorderHand(cards);
+  };
+
+  const sortHand = (mode: 'suit' | 'rank' | 'drawn') => {
+    const sorted = [...displayHand].sort((a, b) => {
+      if (mode === 'drawn') {
+        return (handOrderRef.current[a.id] ?? 0) - (handOrderRef.current[b.id] ?? 0);
+      }
+      if (mode === 'suit') {
+        return SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit] || RANK_ORDER[a.rank] - RANK_ORDER[b.rank];
+      }
+      return RANK_ORDER[a.rank] - RANK_ORDER[b.rank] || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
+    });
+    applyHandOrder(sorted);
+    showToast(t(locale, dict, `client.sort${mode === 'suit' ? 'Suit' : mode === 'rank' ? 'Rank' : 'Drawn'}`));
+  };
+
+  const moveSelectedCards = (direction: -1 | 1) => {
+    if (selectedCards.length === 0) return;
+    const selectedSet = new Set(selectedCards);
+    const next = [...displayHand];
+    const indexes = direction < 0
+      ? next.map((card, index) => ({ card, index })).filter(item => selectedSet.has(item.card.id))
+      : next.map((card, index) => ({ card, index })).filter(item => selectedSet.has(item.card.id)).reverse();
+
+    for (const { index } of indexes) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= next.length || selectedSet.has(next[targetIndex].id)) continue;
+      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    }
+
+    applyHandOrder(next);
+  };
 
   const toggleSelect = (cardId: string) => {
     setSelectedCards(prev => (prev.includes(cardId) ? prev.filter(id => id !== cardId) : [...prev, cardId]));
@@ -373,6 +469,36 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
     }
 
     setSelectedCards([]);
+  };
+
+  const handleGiveSelected = (targetPlayerId: string) => {
+    const cardsToGive = displayHand.filter(card => selectedCards.includes(card.id));
+    if (cardsToGive.length === 0) return;
+
+    if (navigator.vibrate) navigator.vibrate(15);
+
+    if (isPreview) {
+      const target = localGameState.players[targetPlayerId];
+      setLocalHand(prev => prev.filter(card => !cardsToGive.some(selected => selected.id === card.id)));
+      setLocalGameState(prev => {
+        const nextPlayers = { ...prev.players };
+        if (nextPlayers[targetPlayerId]) {
+          nextPlayers[targetPlayerId] = {
+            ...nextPlayers[targetPlayerId],
+            handCount: nextPlayers[targetPlayerId].handCount + cardsToGive.length,
+          };
+        }
+        return { ...prev, players: nextPlayers };
+      });
+      setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'GIVE_CARD', playerName, targetPlayerName: target?.name, cards: cardsToGive, count: cardsToGive.length }]);
+      showToast(t(locale, dict, 'client.gaveCards', { n: String(cardsToGive.length), name: target?.name || '' }));
+    } else {
+      giveCards(targetPlayerId, cardsToGive);
+      showToast(t(locale, dict, 'client.waitingForAccept'));
+    }
+
+    setSelectedCards([]);
+    setTargetActionPlayerId(null);
   };
 
   const handleTakeBack = () => {
@@ -663,6 +789,7 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
   }
 
   const targetPlayer = viewOther && activeGameState ? activeGameState.players[viewOther] : null;
+  const targetActionPlayer = targetActionPlayerId && activeGameState ? activeGameState.players[targetActionPlayerId] : null;
 
   if (viewOther && targetPlayer) {
     return (
@@ -803,6 +930,66 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
         </div>
       )}
 
+      {activePendingConfirmation && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/65 px-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-2xl border border-cyan-300/20 bg-slate-900 p-5 shadow-2xl">
+            <div className="text-center">
+              <div className="mb-2 text-xs font-black uppercase tracking-[0.22em] text-cyan-200">{t(locale, dict, 'client.confirmRequest')}</div>
+              <div className="mb-5 text-base font-black leading-relaxed text-white">{pendingConfirmationText()}</div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => respondToPendingAction(activePendingConfirmation.id, false)}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white active:scale-[0.98] transition-all"
+                >
+                  {t(locale, dict, 'client.reject')}
+                </button>
+                <button
+                  onClick={() => respondToPendingAction(activePendingConfirmation.id, true)}
+                  className="flex-1 rounded-xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 active:scale-[0.98] transition-all"
+                >
+                  {t(locale, dict, 'client.approve')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {targetActionPlayer && (
+        <div className="absolute inset-0 z-[55] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-5 shadow-2xl">
+            <div className="text-center">
+              <div className="mb-1 text-xs font-black uppercase tracking-[0.22em] text-sky-200">{targetActionPlayer.name}</div>
+              <div className="mb-5 text-base font-black text-white">{t(locale, dict, 'client.choosePlayerAction')}</div>
+              <div className="grid gap-3">
+                <button
+                  onClick={() => {
+                    setViewOther(targetActionPlayer.id);
+                    setTargetActionPlayerId(null);
+                  }}
+                  className="rounded-xl border border-sky-300/20 bg-sky-400/15 px-4 py-3 text-sm font-black text-sky-100 active:scale-[0.98] transition-all"
+                >
+                  {t(locale, dict, 'client.requestDrawFromPlayer')}
+                </button>
+                <button
+                  onClick={() => handleGiveSelected(targetActionPlayer.id)}
+                  disabled={selectedCards.length === 0}
+                  className="rounded-xl border border-emerald-300/20 bg-emerald-400/15 px-4 py-3 text-sm font-black text-emerald-100 active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100"
+                >
+                  {t(locale, dict, 'client.offerSelectedCards', { n: String(selectedCards.length) })}
+                </button>
+                <button
+                  onClick={() => setTargetActionPlayerId(null)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white/75 active:scale-[0.98] transition-all"
+                >
+                  {t(locale, dict, 'client.cancel')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isPreview && (
         <div className="absolute top-4 right-4 z-40 rounded-full border border-violet-300/20 bg-violet-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.24em] text-violet-200 backdrop-blur">
           Preview
@@ -921,12 +1108,12 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
                     <button
                       key={player.id}
                       type="button"
-                      onClick={() => setViewOther(player.id)}
+                      onClick={() => setTargetActionPlayerId(player.id)}
                       className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/8 bg-slate-950/60 px-2.5 py-1 text-left shadow-lg active:scale-[0.98] transition-all"
                     >
                       <div className="text-xs font-black text-white truncate max-w-[5rem]">{player.name}</div>
                       <div className="text-[10px] text-slate-400">{player.handCount}{t(locale, dict, 'client.cards')}</div>
-                      <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-300">{t(locale, dict, 'client.peekDraw')}</div>
+                      <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-300">{t(locale, dict, 'client.playerActions')}</div>
                     </button>
                   ))}
               </div>
@@ -940,24 +1127,35 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
             <button
               onClick={handleDrawAction}
               disabled={isDrawing}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 ${
+              className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-4 py-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 ${
                 dragActive && dragOverReturnTopArea
                   ? 'border-amber-400/60 bg-amber-500/20 shadow-[0_0_40px_rgba(251,191,36,0.2)]'
                   : 'border-white/8 bg-slate-950/60'
               }`}
             >
-              <div className="text-xs font-black text-white">{t(locale, dict, 'tableConfig.deck')}</div>
-              <div className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-black text-white">{activeGameState.deckCount}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-xs font-black text-white">{t(locale, dict, 'client.drawFromDeck')}</div>
+                <div className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-black text-white">{activeGameState.deckCount}</div>
+              </div>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-amber-200/75">
+                {dragActive ? t(locale, dict, 'client.releaseReturnTop') : t(locale, dict, 'client.dragReturnTop')}
+              </div>
             </button>
             <div
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 shadow-lg transition-all ${
+              className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-4 py-2.5 shadow-lg transition-all ${
                 dragActive && dragOverReturnBottomArea
                   ? 'border-amber-400/60 bg-amber-500/20 shadow-[0_0_40px_rgba(251,191,36,0.2)]'
                   : 'border-white/8 bg-slate-950/60'
               }`}
             >
-              <div className="text-xs font-black text-white">{t(locale, dict, 'host.returnBottom')}</div>
-              <div className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-black text-white">{activeGameState.discardPile.length}</div>
+              <div className="text-xs font-black text-white">{t(locale, dict, 'client.returnToBottomZone')}</div>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-amber-200/75">
+                {dragActive ? t(locale, dict, 'client.releaseReturnBottom') : t(locale, dict, 'client.dragReturnBottom')}
+              </div>
+            </div>
+            <div className="flex min-w-16 flex-col items-center justify-center rounded-xl border border-white/8 bg-slate-950/50 px-3 py-2 text-center">
+              <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">{t(locale, dict, 'tableConfig.discard')}</div>
+              <div className="text-sm font-black text-white/80">{activeGameState.discardPile.length}</div>
             </div>
           </div>
         )}
@@ -967,10 +1165,58 @@ function ConnectedClient({ hostId, playerName, isPreview }: { hostId: string; pl
         >
           <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-1">
             <div>
-              <div className="text-xs text-white/60">手牌区</div>
+              <div className="text-xs text-white/60">{t(locale, dict, 'client.yourHand')}</div>
             </div>
-            <div className="rounded-full border border-white/8 bg-slate-950/40 px-2.5 py-1 text-[10px] font-black text-white/85">
-              {hand.length} {t(locale, dict, 'client.cards')}
+            <div className="flex max-w-[75%] flex-wrap items-center justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => sortHand('suit')}
+                className="rounded-md border border-white/8 bg-slate-950/55 px-2 py-1 text-[10px] font-bold text-white/70 active:scale-95"
+              >
+                {t(locale, dict, 'client.sortSuit')}
+              </button>
+              <button
+                type="button"
+                onClick={() => sortHand('rank')}
+                className="rounded-md border border-white/8 bg-slate-950/55 px-2 py-1 text-[10px] font-bold text-white/70 active:scale-95"
+              >
+                {t(locale, dict, 'client.sortRank')}
+              </button>
+              <button
+                type="button"
+                onClick={() => sortHand('drawn')}
+                className="rounded-md border border-white/8 bg-slate-950/55 px-2 py-1 text-[10px] font-bold text-white/70 active:scale-95"
+              >
+                {t(locale, dict, 'client.sortDrawn')}
+              </button>
+              {selectedCards.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => moveSelectedCards(-1)}
+                    className="rounded-md border border-amber-300/20 bg-amber-400/15 px-2 py-1 text-[10px] font-black text-amber-200 active:scale-95"
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveSelectedCards(1)}
+                    className="rounded-md border border-amber-300/20 bg-amber-400/15 px-2 py-1 text-[10px] font-black text-amber-200 active:scale-95"
+                  >
+                    →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCards([])}
+                    className="rounded-md border border-white/8 bg-slate-950/55 px-2 py-1 text-[10px] font-bold text-white/70 active:scale-95"
+                  >
+                    {t(locale, dict, 'client.clearSelection')}
+                  </button>
+                </>
+              )}
+              <div className="rounded-full border border-white/8 bg-slate-950/40 px-2.5 py-1 text-[10px] font-black text-white/85">
+                {hand.length} {t(locale, dict, 'client.cards')}
+              </div>
             </div>
           </div>
 

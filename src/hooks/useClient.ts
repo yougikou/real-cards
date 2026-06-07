@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Peer, { type DataConnection } from 'peerjs';
-import type { Card, GameState, ClientAction, HostMessage } from '../types';
+import type { Card, GameState, ClientAction, HostMessage, PendingAction } from '../types';
 
 export function useClient(hostId: string, playerName: string) {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'failed' | 'retrying' | 'reconnecting'>('connecting');
@@ -11,6 +11,7 @@ export function useClient(hostId: string, playerName: string) {
   const [hand, setHand] = useState<Card[]>([]);
   const [peerId, setPeerId] = useState<string | null>(null);
   const [undoableActionCount, setUndoableActionCount] = useState(0);
+  const [pendingConfirmations, setPendingConfirmations] = useState<PendingAction[]>([]);
   const undoableActionCountRef = useRef(0);
 
   const connRef = useRef<DataConnection | null>(null);
@@ -71,6 +72,12 @@ export function useClient(hostId: string, playerName: string) {
             conn.close();
             setStatus('failed');
             setError(message.payload);
+            break;
+          case 'CONFIRMATION_REQUEST':
+            setPendingConfirmations(prev => {
+              if (prev.some(action => action.id === message.payload.id)) return prev;
+              return [...prev, message.payload];
+            });
             break;
         }
       });
@@ -155,15 +162,31 @@ export function useClient(hostId: string, playerName: string) {
     sendAction({ type: 'DRAW_FROM_OTHER', payload: { targetPlayerId, cardId } });
   };
 
+  const giveCards = (targetPlayerId: string, cards: Card[]) => {
+    trackAction();
+    sendAction({ type: 'GIVE_CARD', payload: { targetPlayerId, cards } });
+  };
+
   const clearTable = () => {
     sendAction({ type: 'CLEAR_TABLE', payload: {} });
   };
 
   const undoLastAction = () => {
     if (undoableActionCountRef.current === 0) return;
-    undoableActionCountRef.current -= 1;
-    setUndoableActionCount(undoableActionCountRef.current);
     sendAction({ type: 'UNDO_LAST_ACTION', payload: {} });
+  };
+
+  const respondToPendingAction = (pendingActionId: string, approved: boolean) => {
+    setPendingConfirmations(prev => prev.filter(action => action.id !== pendingActionId));
+    sendAction({ type: 'RESPOND_PENDING_ACTION', payload: { pendingActionId, approved } });
+  };
+
+  const reorderHand = (cards: Card[]) => {
+    const nextIds = new Set(cards.map(card => card.id));
+    setHand(prev => {
+      const missingCards = prev.filter(card => !nextIds.has(card.id));
+      return [...cards, ...missingCards];
+    });
   };
 
   return {
@@ -173,12 +196,16 @@ export function useClient(hostId: string, playerName: string) {
     gameState,
     hand,
     peerId,
+    pendingConfirmations,
     undoableActionCount,
     drawCard,
     playCards,
     returnCards,
     drawFromOther,
+    giveCards,
     clearTable,
     undoLastAction,
+    reorderHand,
+    respondToPendingAction,
   };
 }
