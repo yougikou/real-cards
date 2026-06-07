@@ -167,8 +167,7 @@ export function useHost() {
 
     for (const [clientId, cardIds] of Object.entries(removedCardIdsByPlayer)) {
       if (cardIds.length > 0) {
-        const msg: HostMessage = { type: 'REMOVE_CARDS', payload: cardIds };
-        connectionsRef.current[clientId]?.send(msg);
+        sendToPlayer(clientId, { type: 'REMOVE_CARDS', payload: cardIds });
       }
     }
 
@@ -199,6 +198,10 @@ export function useHost() {
     });
   };
 
+  const sendToPlayer = (playerId: string, message: HostMessage) => {
+    connectionsRef.current[playerId]?.send(message);
+  };
+
   const MAX_EVENT_LOG = 200;
 
   const updateStateAndBroadcast = (updater: (prev: GameState) => GameState) => {
@@ -227,6 +230,26 @@ export function useHost() {
         { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const, cards },
       );
     });
+  };
+
+  const dealCardsToPlayer = (playerId: string, count = 1) => {
+    const cards = drawFromDeck(serverStateRef.current, count);
+    if (cards.length === 0 || !addCardsToHand(serverStateRef.current, playerId, cards)) return;
+
+    sendToPlayer(playerId, { type: 'RECEIVE_CARDS', payload: cards });
+
+    updateStateAndBroadcast(prev => appendMoveAndEvent(
+      withPlayerHandCount(withDeckCount(prev, serverStateRef.current), serverStateRef.current, playerId),
+      {
+        action: 'HOST_DEAL',
+        targetPlayerId: playerId,
+        targetName: prev.players[playerId]?.name,
+        from: 'deck',
+        to: 'hand',
+        cards,
+      },
+      { timestamp: Date.now(), type: 'HOST_DEAL' as const, playerName: prev.players[playerId]?.name, cards },
+    ));
   };
 
   const assignSeat = (playerId: string, seatId?: string) => {
@@ -263,7 +286,7 @@ export function useHost() {
   const requestPendingAction = (pendingAction: PendingAction) => {
     updateStateAndBroadcast(prev => addPendingAction(prev, pendingAction));
     if (pendingAction.confirmationMode === 'counterparty' && pendingAction.counterpartyPlayerId) {
-      connectionsRef.current[pendingAction.counterpartyPlayerId]?.send({
+      sendToPlayer(pendingAction.counterpartyPlayerId, {
         type: 'CONFIRMATION_REQUEST',
         payload: pendingAction,
       });
@@ -291,7 +314,7 @@ export function useHost() {
       movedCards = removeCardsFromHand(serverStateRef.current, handOwner, move.cards.map(card => card.id));
       returnCardsToDeck(serverStateRef.current, movedCards, true);
       if (movedCards.length > 0) {
-        connectionsRef.current[handOwner]?.send({ type: 'REMOVE_CARDS', payload: movedCards.map(card => card.id) });
+        sendToPlayer(handOwner, { type: 'REMOVE_CARDS', payload: movedCards.map(card => card.id) });
         affectedPlayerIds.add(handOwner);
       }
       from = 'hand';
@@ -306,21 +329,21 @@ export function useHost() {
       movedCards = cards;
       nextPlayStack = nextState.playStack;
       if (movedCards.length > 0) {
-        connectionsRef.current[actorPlayerId]?.send({ type: 'RECEIVE_CARDS', payload: movedCards });
+        sendToPlayer(actorPlayerId, { type: 'RECEIVE_CARDS', payload: movedCards });
         affectedPlayerIds.add(actorPlayerId);
       }
     } else if (move.from === 'hand' && (move.to === 'deckTop' || move.to === 'deckBottom')) {
       removeCardsFromDeck(serverStateRef.current, move.cards.map(card => card.id));
       addCardsToHand(serverStateRef.current, actorPlayerId, move.cards);
       movedCards = move.cards;
-      connectionsRef.current[actorPlayerId]?.send({ type: 'RECEIVE_CARDS', payload: movedCards });
+      sendToPlayer(actorPlayerId, { type: 'RECEIVE_CARDS', payload: movedCards });
       affectedPlayerIds.add(actorPlayerId);
     } else if (move.from === 'hand' && move.to === 'hand' && move.fromPlayerId && move.toPlayerId) {
       movedCards = removeCardsFromHand(serverStateRef.current, move.toPlayerId, move.cards.map(card => card.id));
       if (movedCards.length > 0) {
         addCardsToHand(serverStateRef.current, move.fromPlayerId, movedCards);
-        connectionsRef.current[move.toPlayerId]?.send({ type: 'REMOVE_CARDS', payload: movedCards.map(card => card.id) });
-        connectionsRef.current[move.fromPlayerId]?.send({ type: 'RECEIVE_CARDS', payload: movedCards });
+        sendToPlayer(move.toPlayerId, { type: 'REMOVE_CARDS', payload: movedCards.map(card => card.id) });
+        sendToPlayer(move.fromPlayerId, { type: 'RECEIVE_CARDS', payload: movedCards });
         affectedPlayerIds.add(move.toPlayerId);
         affectedPlayerIds.add(move.fromPlayerId);
       }
@@ -390,8 +413,8 @@ export function useHost() {
         return;
       }
 
-      connectionsRef.current[counterpartyId]?.send({ type: 'REMOVE_CARDS', payload: [stolenCard.id] });
-      connectionsRef.current[requesterId]?.send({ type: 'RECEIVE_CARDS', payload: [stolenCard] });
+      sendToPlayer(counterpartyId, { type: 'REMOVE_CARDS', payload: [stolenCard.id] });
+      sendToPlayer(requesterId, { type: 'RECEIVE_CARDS', payload: [stolenCard] });
 
       updateStateAndBroadcast(prev => {
         const requester = prev.players[requesterId];
@@ -428,8 +451,8 @@ export function useHost() {
         return;
       }
 
-      connectionsRef.current[requesterId]?.send({ type: 'REMOVE_CARDS', payload: movedCards.map(card => card.id) });
-      connectionsRef.current[counterpartyId]?.send({ type: 'RECEIVE_CARDS', payload: movedCards });
+      sendToPlayer(requesterId, { type: 'REMOVE_CARDS', payload: movedCards.map(card => card.id) });
+      sendToPlayer(counterpartyId, { type: 'RECEIVE_CARDS', payload: movedCards });
 
       updateStateAndBroadcast(prev => {
         const requester = prev.players[requesterId];
@@ -507,7 +530,7 @@ export function useHost() {
         if (existingPeerId && existingPeerId !== clientId) {
           if (connectionsRef.current[existingPeerId]) {
             // Original player still connected → duplicate name, reject
-            connectionsRef.current[clientId]?.send({ type: 'ERROR', payload: `Name "${playerName}" is already taken.` });
+            sendToPlayer(clientId, { type: 'ERROR', payload: `Name "${playerName}" is already taken.` });
             break;
           }
           // Reconnection: transfer server state from old peer ID to new
@@ -538,7 +561,7 @@ export function useHost() {
 
           // Send existing cards back to reconnecting client
           if (existingHand.length > 0) {
-            connectionsRef.current[clientId]?.send({ type: 'RECEIVE_CARDS', payload: existingHand });
+            sendToPlayer(clientId, { type: 'RECEIVE_CARDS', payload: existingHand });
           }
           break;
         }
@@ -546,7 +569,7 @@ export function useHost() {
         // Duplicate name check for genuinely new connections
         const isNameTaken = Object.values(gameStateRef.current.players).some(p => p.name === playerName);
         if (isNameTaken) {
-          connectionsRef.current[clientId]?.send({ type: 'ERROR', payload: `Name "${playerName}" is already taken.` });
+          sendToPlayer(clientId, { type: 'ERROR', payload: `Name "${playerName}" is already taken.` });
           break;
         }
 
@@ -575,7 +598,7 @@ export function useHost() {
         history[clientId].push({ type: 'DRAW', payload: { drawnCards } });
 
         const msg: HostMessage = { type: 'RECEIVE_CARDS', payload: drawnCards };
-        connectionsRef.current[clientId]?.send(msg);
+        sendToPlayer(clientId, msg);
 
         updateStateAndBroadcast(prev => appendMoveAndEvent(
           withPlayerHandCount(withDeckCount(prev, serverStateRef.current), serverStateRef.current, clientId),
@@ -753,7 +776,7 @@ export function useHost() {
         if (cards.length === 0 || !addCardsToHand(serverStateRef.current, playerId, cards)) return;
 
         const msg: HostMessage = { type: 'RECEIVE_CARDS', payload: cards };
-        connectionsRef.current[playerId]?.send(msg);
+        sendToPlayer(playerId, msg);
 
         updateStateAndBroadcast(prev => appendMoveAndEvent(
           withPlayerHandCount(withDeckCount(prev, serverStateRef.current), serverStateRef.current, playerId),
@@ -1004,6 +1027,7 @@ export function useHost() {
     serverStateRef,
     resetGame,
     clearTableToDiscard,
+    dealCardsToPlayer,
     assignSeat,
     approvePendingAction,
     rejectPendingAction,

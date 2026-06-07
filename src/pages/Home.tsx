@@ -32,6 +32,11 @@ export default function Home() {
     navigate('/host');
   };
 
+  const handleCreatePhoneRoom = () => {
+    const cleanName = playerName.trim();
+    navigate(`/host?phone=true${cleanName ? `&name=${encodeURIComponent(cleanName)}` : ''}`);
+  };
+
   const handleJoinRoom = () => {
     const cleanRoom = roomId.trim();
     const cleanName = playerName.trim();
@@ -82,6 +87,15 @@ export default function Home() {
             <div className="text-xs font-black uppercase tracking-[0.24em] opacity-70">{t(locale, dict, 'home.hostGame')}</div>
             <div className="mt-1 text-2xl font-black">{t(locale, dict, 'home.createTable')}</div>
             <div className="mt-2 text-sm font-bold opacity-75">{t(locale, dict, 'home.createHint')}</div>
+          </button>
+
+          <button
+            onClick={handleCreatePhoneRoom}
+            className="mt-3 w-full rounded-2xl border border-cyan-300/25 bg-cyan-400/15 px-4 py-3 text-left text-cyan-50 shadow-[0_18px_44px_rgba(14,165,233,0.12)] transition-transform active:scale-[0.99]"
+          >
+            <div className="text-xs font-black uppercase tracking-[0.24em] text-cyan-200">{t(locale, dict, 'home.phoneHost')}</div>
+            <div className="mt-1 text-xl font-black">{t(locale, dict, 'home.createPhoneHost')}</div>
+            <div className="mt-1 text-sm font-bold text-cyan-100/70">{t(locale, dict, 'home.phoneHostHint')}</div>
           </button>
 
           <div className="my-4 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.22em] text-white/35">
