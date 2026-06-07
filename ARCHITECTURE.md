@@ -29,7 +29,12 @@ This keeps undo, event logging, replay, and multiplayer reconciliation predictab
 
 ## Table bridge
 
-React and Phaser communicate through `src/bridge/tableBridge.ts`. Prefer the typed helpers there over raw `window.dispatchEvent` strings so payloads stay explicit as the table grows.
+React and Phaser communicate through `src/bridge/tableBridge.ts`. The bridge is the only module that should touch DOM event channels.
+
+- `react-host -> phaser-table`: table snapshots (`players`, `deckCount`, `discardPile`, `playStack`, `reset`) project authoritative React state into Phaser.
+- `phaser-table -> react-host`: host commands (`dealCardToPlayer`, `popDeckCardForDrag`, `revealDeckCardToTable`, etc.) request state changes from the Host hook.
+
+Phaser may make cards feel physical, but every durable card movement still resolves through `useHost` and `cardFlows`.
 
 ## Near-term product loop
 

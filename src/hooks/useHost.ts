@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Peer, { type DataConnection } from 'peerjs';
 import type { Card, GameState, ClientAction, HostMessage } from '../types';
 import { createDeck } from '../utils/deck';
-import { TABLE_EVENTS, emitTableEvent, onTableEvent } from '../bridge/tableBridge';
+import { emitTableSnapshot, onHostCommand } from '../bridge/tableBridge';
 import {
   addCardsToHand,
   appendEvent,
@@ -82,7 +82,7 @@ export function useHost() {
       { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const },
     ));
 
-    emitTableEvent(TABLE_EVENTS.reset);
+    emitTableSnapshot('reset');
   };
 
   // Keep true deck and hands server-side
@@ -114,6 +114,14 @@ export function useHost() {
       }
       broadcastState(next);
       return next;
+    });
+  };
+
+  const clearTableToDiscard = () => {
+    updateStateAndBroadcast(prev => {
+      const { nextState, cards } = clearPlayStackToDiscard(prev);
+      if (cards.length === 0) return prev;
+      return appendEvent(nextState, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const, cards });
     });
   };
 
@@ -248,11 +256,7 @@ export function useHost() {
         break;
       }
       case 'CLEAR_TABLE': {
-        updateStateAndBroadcast(prev => {
-          const { nextState, cards } = clearPlayStackToDiscard(prev);
-          if (cards.length === 0) return prev;
-          return appendEvent(nextState, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const, cards });
-        });
+        clearTableToDiscard();
         break;
       }
       case 'UNDO_LAST_ACTION': {
@@ -342,7 +346,7 @@ export function useHost() {
 
   useEffect(() => {
     const cleanupTableEvents = [
-      onTableEvent(TABLE_EVENTS.hostDealCard, ({ playerId, cardData }) => {
+      onHostCommand('dealCardToPlayer', ({ playerId, cardData }) => {
         const cards = cardData ? [cardData] : drawFromDeck(serverStateRef.current, 1);
         if (cards.length === 0 || !addCardsToHand(serverStateRef.current, playerId, cards)) return;
 
@@ -354,7 +358,7 @@ export function useHost() {
           { timestamp: Date.now(), type: 'HOST_DEAL' as const, playerName: prev.players[playerId]?.name, cards },
         ));
       }),
-      onTableEvent(TABLE_EVENTS.hostPopCard, ({ callback }) => {
+      onHostCommand('popDeckCardForDrag', ({ callback }) => {
         const [popped] = drawFromDeck(serverStateRef.current, 1);
         if (!popped) {
           callback(null);
@@ -367,7 +371,7 @@ export function useHost() {
         ));
         callback(popped);
       }),
-      onTableEvent(TABLE_EVENTS.hostReturnPoppedCard, ({ cardData }) => {
+      onHostCommand('returnPoppedDeckCard', ({ cardData }) => {
         returnCardsToDeck(serverStateRef.current, [cardData], true);
 
         updateStateAndBroadcast(prev => appendEvent(
@@ -375,7 +379,7 @@ export function useHost() {
           { timestamp: Date.now(), type: 'HOST_RETURN_BATCH' as const, cards: [cardData] },
         ));
       }),
-      onTableEvent(TABLE_EVENTS.hostDrawToTable, () => {
+      onHostCommand('drawDeckCardToTable', () => {
         const [drawnCard] = drawFromDeck(serverStateRef.current, 1);
         if (!drawnCard) return;
 
@@ -384,13 +388,13 @@ export function useHost() {
           { timestamp: Date.now(), type: 'HOST_DRAW_TO_TABLE' as const, cards: [drawnCard] },
         ));
       }),
-      onTableEvent(TABLE_EVENTS.hostDealToTable, ({ cardData }) => {
+      onHostCommand('revealDeckCardToTable', ({ cardData }) => {
         updateStateAndBroadcast(prev => appendEvent(
           appendPlayStackBatch(prev, [cardData]),
           { timestamp: Date.now(), type: 'HOST_DRAW_TO_TABLE' as const, cards: [cardData] },
         ));
       }),
-      onTableEvent(TABLE_EVENTS.hostReturnBatch, ({ toTop }) => {
+      onHostCommand('returnTableBatchToDeck', ({ toTop }) => {
         updateStateAndBroadcast(prev => {
           const { nextState, cards } = popPlayStackBatch(prev);
           if (cards.length === 0) return prev;
@@ -402,26 +406,20 @@ export function useHost() {
           );
         });
       }),
-      onTableEvent(TABLE_EVENTS.hostClearTable, () => {
-        updateStateAndBroadcast(prev => {
-          const { nextState, cards } = clearPlayStackToDiscard(prev);
-          if (cards.length === 0) return prev;
-          return appendEvent(nextState, { timestamp: Date.now(), type: 'HOST_CLEAR_TABLE' as const, cards });
-        });
-      }),
-      onTableEvent(TABLE_EVENTS.hostDragPublicCard, ({ cardData }) => {
+      onHostCommand('clearTableToDiscard', clearTableToDiscard),
+      onHostCommand('takePublicCardForDrag', ({ cardData }) => {
         updateStateAndBroadcast(prev => appendEvent(
           removeCardsFromPlayStack(prev, [cardData]),
           { timestamp: Date.now(), type: 'HOST_TAKE_FROM_TABLE' as const, cards: [cardData] },
         ));
       }),
-      onTableEvent(TABLE_EVENTS.hostReturnPublicCard, ({ cardData }) => {
+      onHostCommand('returnPublicCardToTable', ({ cardData }) => {
         updateStateAndBroadcast(prev => appendEvent(
           appendPlayStackBatch(prev, [cardData]),
           { timestamp: Date.now(), type: 'HOST_RETURN_TO_TABLE' as const, cards: [cardData] },
         ));
       }),
-      onTableEvent(TABLE_EVENTS.hostDiscardCard, ({ cardData }) => {
+      onHostCommand('discardPublicCard', ({ cardData }) => {
         updateStateAndBroadcast(prev => appendEvent(
           discardCards(prev, [cardData]),
           { timestamp: Date.now(), type: 'HOST_DISCARD' as const, cards: [cardData] },
@@ -524,5 +522,5 @@ export function useHost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryCount]);
 
-  return { status, error, retry, peerId, gameState, updateStateAndBroadcast, serverStateRef, resetGame };
+  return { status, error, retry, peerId, gameState, updateStateAndBroadcast, serverStateRef, resetGame, clearTableToDiscard };
 }

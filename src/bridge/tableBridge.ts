@@ -1,61 +1,133 @@
 import type { Card, Player } from '../types';
 
-export const TABLE_EVENTS = {
-  reset: 'table-reset',
-  playersUpdated: 'players-updated',
-  deckCountUpdated: 'deck-count-updated',
-  discardCountUpdated: 'discard-count-updated',
-  playStackUpdated: 'play-stack-updated',
-  hostDealCard: 'host-deal-card',
-  hostPopCard: 'host-pop-card',
-  hostReturnPoppedCard: 'host-return-popped-card',
-  hostDrawToTable: 'host-draw-to-table',
-  hostDealToTable: 'host-deal-to-table',
-  hostReturnBatch: 'host-return-batch',
-  hostClearTable: 'host-clear-table',
-  hostDragPublicCard: 'host-drag-public-card',
-  hostReturnPublicCard: 'host-return-public-card',
-  hostDiscardCard: 'host-discard-card',
+export type TableBridgeSource = 'react-host' | 'phaser-table';
+export type TableBridgeTarget = 'react-host' | 'phaser-table';
+
+const TABLE_BRIDGE_CHANNELS = {
+  hostCommand: 'real-cards:table-bridge:host-command',
+  tableSnapshot: 'real-cards:table-bridge:table-snapshot',
 } as const;
 
-export interface TableEventDetailMap {
-  [TABLE_EVENTS.reset]: undefined;
-  [TABLE_EVENTS.playersUpdated]: { players: Record<string, Player> };
-  [TABLE_EVENTS.deckCountUpdated]: { count: number };
-  [TABLE_EVENTS.discardCountUpdated]: { count: number; topCard?: Pick<Card, 'rank' | 'suit'> | null };
-  [TABLE_EVENTS.playStackUpdated]: { playStack: Card[][] };
-  [TABLE_EVENTS.hostDealCard]: { playerId: string; cardData?: Card };
-  [TABLE_EVENTS.hostPopCard]: { callback: (card: Card | null) => void };
-  [TABLE_EVENTS.hostReturnPoppedCard]: { cardData: Card };
-  [TABLE_EVENTS.hostDrawToTable]: undefined;
-  [TABLE_EVENTS.hostDealToTable]: { cardData: Card };
-  [TABLE_EVENTS.hostReturnBatch]: { toTop: boolean };
-  [TABLE_EVENTS.hostClearTable]: undefined;
-  [TABLE_EVENTS.hostDragPublicCard]: { cardData: Card; x: number; y: number };
-  [TABLE_EVENTS.hostReturnPublicCard]: { cardData: Card };
-  [TABLE_EVENTS.hostDiscardCard]: { cardData: Card };
+export interface TableBridgeEnvelope<
+  Kind extends keyof typeof TABLE_BRIDGE_CHANNELS,
+  Name extends string,
+  Detail,
+> {
+  id: string;
+  kind: Kind;
+  name: Name;
+  source: TableBridgeSource;
+  target: TableBridgeTarget;
+  detail: Detail;
+  createdAt: number;
 }
 
-type TableEventName = keyof TableEventDetailMap;
-
-export function emitTableEvent<Name extends TableEventName>(
-  name: Name,
-  ...detail: TableEventDetailMap[Name] extends undefined ? [] : [TableEventDetailMap[Name]]
-): void {
-  if (detail.length === 0) {
-    window.dispatchEvent(new Event(name));
-    return;
-  }
-  window.dispatchEvent(new CustomEvent(name, { detail: detail[0] }));
+export interface HostCommandDetailMap {
+  dealCardToPlayer: { playerId: string; cardData?: Card };
+  popDeckCardForDrag: { callback: (card: Card | null) => void };
+  returnPoppedDeckCard: { cardData: Card };
+  drawDeckCardToTable: undefined;
+  revealDeckCardToTable: { cardData: Card };
+  returnTableBatchToDeck: { toTop: boolean };
+  clearTableToDiscard: undefined;
+  takePublicCardForDrag: { cardData: Card; pointer: { x: number; y: number } };
+  returnPublicCardToTable: { cardData: Card };
+  discardPublicCard: { cardData: Card };
 }
 
-export function onTableEvent<Name extends TableEventName>(
-  name: Name,
-  handler: (detail: TableEventDetailMap[Name]) => void,
+export interface TableSnapshotDetailMap {
+  reset: undefined;
+  players: { players: Record<string, Player> };
+  deckCount: { count: number };
+  discardPile: { count: number; topCard?: Pick<Card, 'rank' | 'suit'> | null };
+  playStack: { playStack: Card[][] };
+}
+
+export type HostCommandName = keyof HostCommandDetailMap;
+export type TableSnapshotName = keyof TableSnapshotDetailMap;
+
+export type HostCommandEnvelope<Name extends HostCommandName = HostCommandName> =
+  TableBridgeEnvelope<'hostCommand', Name, HostCommandDetailMap[Name]>;
+
+export type TableSnapshotEnvelope<Name extends TableSnapshotName = TableSnapshotName> =
+  TableBridgeEnvelope<'tableSnapshot', Name, TableSnapshotDetailMap[Name]>;
+
+function createBridgeId(source: TableBridgeSource, target: TableBridgeTarget, name: string) {
+  return `${source}->${target}:${name}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+function emitBridgeEvent<
+  Kind extends keyof typeof TABLE_BRIDGE_CHANNELS,
+  Name extends string,
+  Detail,
+>(
+  channel: Kind,
+  envelope: TableBridgeEnvelope<Kind, Name, Detail>,
+) {
+  window.dispatchEvent(new CustomEvent(TABLE_BRIDGE_CHANNELS[channel], { detail: envelope }));
+}
+
+function onBridgeEvent<
+  Kind extends keyof typeof TABLE_BRIDGE_CHANNELS,
+  Name extends string,
+  Detail,
+>(
+  channel: Kind,
+  handler: (envelope: TableBridgeEnvelope<Kind, Name, Detail>) => void,
 ): () => void {
   const listener = (event: Event) => {
-    handler((event as CustomEvent<TableEventDetailMap[Name]>).detail);
+    handler((event as CustomEvent<TableBridgeEnvelope<Kind, Name, Detail>>).detail);
   };
-  window.addEventListener(name, listener);
-  return () => window.removeEventListener(name, listener);
+  window.addEventListener(TABLE_BRIDGE_CHANNELS[channel], listener);
+  return () => window.removeEventListener(TABLE_BRIDGE_CHANNELS[channel], listener);
+}
+
+export function emitHostCommand<Name extends HostCommandName>(
+  name: Name,
+  ...detail: HostCommandDetailMap[Name] extends undefined ? [] : [HostCommandDetailMap[Name]]
+): void {
+  emitBridgeEvent('hostCommand', {
+    id: createBridgeId('phaser-table', 'react-host', name),
+    kind: 'hostCommand',
+    name,
+    source: 'phaser-table',
+    target: 'react-host',
+    detail: detail[0] as HostCommandDetailMap[Name],
+    createdAt: Date.now(),
+  });
+}
+
+export function onHostCommand<Name extends HostCommandName>(
+  name: Name,
+  handler: (detail: HostCommandDetailMap[Name], envelope: HostCommandEnvelope<Name>) => void,
+): () => void {
+  return onBridgeEvent<'hostCommand', Name, HostCommandDetailMap[Name]>('hostCommand', envelope => {
+    if (envelope.name !== name) return;
+    handler(envelope.detail, envelope as HostCommandEnvelope<Name>);
+  });
+}
+
+export function emitTableSnapshot<Name extends TableSnapshotName>(
+  name: Name,
+  ...detail: TableSnapshotDetailMap[Name] extends undefined ? [] : [TableSnapshotDetailMap[Name]]
+): void {
+  emitBridgeEvent('tableSnapshot', {
+    id: createBridgeId('react-host', 'phaser-table', name),
+    kind: 'tableSnapshot',
+    name,
+    source: 'react-host',
+    target: 'phaser-table',
+    detail: detail[0] as TableSnapshotDetailMap[Name],
+    createdAt: Date.now(),
+  });
+}
+
+export function onTableSnapshot<Name extends TableSnapshotName>(
+  name: Name,
+  handler: (detail: TableSnapshotDetailMap[Name], envelope: TableSnapshotEnvelope<Name>) => void,
+): () => void {
+  return onBridgeEvent<'tableSnapshot', Name, TableSnapshotDetailMap[Name]>('tableSnapshot', envelope => {
+    if (envelope.name !== name) return;
+    handler(envelope.detail, envelope as TableSnapshotEnvelope<Name>);
+  });
 }

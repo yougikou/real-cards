@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import type { Card, Player } from '../types';
 import dict from '../i18n/translations';
 import type { Locale } from '../i18n/LocaleProvider';
-import { TABLE_EVENTS, emitTableEvent, onTableEvent } from '../bridge/tableBridge';
+import { emitHostCommand, onTableSnapshot } from '../bridge/tableBridge';
 
 function getPhaserLocale(): Locale {
   if (typeof window === 'undefined') return 'en';
@@ -135,7 +135,7 @@ class TableScene extends Phaser.Scene {
     this.scale.on('resize', this.handleResize, this);
 
     const cleanupTableEvents = [
-      onTableEvent(TABLE_EVENTS.reset, () => {
+      onTableSnapshot('reset', () => {
         // Find and destroy all floating cards (both face up and face down)
         const allCards = this.children.list.filter(
           child => child instanceof Phaser.Physics.Matter.Image && child.texture && (child.texture.key === 'cardFront' || child.texture.key === 'cardBack' || child.texture.key.startsWith('cface_'))
@@ -159,17 +159,17 @@ class TableScene extends Phaser.Scene {
         this.pendingDragStartPos = null;
         this.pendingDragPointerId = null;
       }),
-      onTableEvent(TABLE_EVENTS.playersUpdated, ({ players }) => {
+      onTableSnapshot('players', ({ players }) => {
         this.connectedPlayers = Object.values(players);
         this.updateZoneLabels();
       }),
-      onTableEvent(TABLE_EVENTS.playStackUpdated, ({ playStack }) => {
+      onTableSnapshot('playStack', ({ playStack }) => {
         this.updatePlayStack(playStack);
       }),
-      onTableEvent(TABLE_EVENTS.deckCountUpdated, ({ count }) => {
+      onTableSnapshot('deckCount', ({ count }) => {
         this.deckCountText?.setText(String(count));
       }),
-      onTableEvent(TABLE_EVENTS.discardCountUpdated, ({ count, topCard }) => {
+      onTableSnapshot('discardPile', ({ count, topCard }) => {
         if (this.discardCountText) {
           this.discardCountText.setText(String(count));
           this.discardCountText.setVisible(count > 0);
@@ -655,7 +655,10 @@ class TableScene extends Phaser.Scene {
 
     // Remove all dragged cards from play stack state
     for (const c of cardSet.values()) {
-      emitTableEvent(TABLE_EVENTS.hostDragPublicCard, { cardData: c as Card, x: pointer.worldX, y: pointer.worldY });
+      emitHostCommand('takePublicCardForDrag', {
+        cardData: c as Card,
+        pointer: { x: pointer.worldX, y: pointer.worldY },
+      });
     }
 
     this.updatePlayStackSelectionVisuals();
@@ -757,7 +760,7 @@ class TableScene extends Phaser.Scene {
     if (!this.matter) return;
 
     let poppedCard: unknown = null;
-    emitTableEvent(TABLE_EVENTS.hostPopCard, {
+    emitHostCommand('popDeckCardForDrag', {
       callback: (card: Card | null) => {
         poppedCard = card;
       },
@@ -913,7 +916,7 @@ class TableScene extends Phaser.Scene {
                 onComplete: () => {
                     card.destroy();
                     for (const cd of allCardData) {
-                      emitTableEvent(TABLE_EVENTS.hostDealCard, { playerId: targetZone!.mappedPlayerId!, cardData: cd as Card });
+                      emitHostCommand('dealCardToPlayer', { playerId: targetZone!.mappedPlayerId!, cardData: cd as Card });
                     }
                 }
             });
@@ -935,7 +938,7 @@ class TableScene extends Phaser.Scene {
                 onComplete: () => {
                     card.destroy();
                     for (const cd of allCardData) {
-                      emitTableEvent(TABLE_EVENTS.hostDiscardCard, { cardData: cd as Card });
+                      emitHostCommand('discardPublicCard', { cardData: cd as Card });
                     }
                 }
             });
@@ -958,7 +961,7 @@ class TableScene extends Phaser.Scene {
                 onComplete: () => {
                     card.destroy();
                     for (const cd of allCardData) {
-                      emitTableEvent(TABLE_EVENTS.hostDealToTable, { cardData: cd as Card });
+                      emitHostCommand('revealDeckCardToTable', { cardData: cd as Card });
                     }
                 }
             });
@@ -966,7 +969,6 @@ class TableScene extends Phaser.Scene {
     } else {
         // Return to PUBLIC TABLE for play-stack cards, or deck for deck-drag cards
         const dragSource = (card as unknown as { dragSource?: string }).dragSource;
-        const returnEvent = dragSource === 'deck' ? TABLE_EVENTS.hostReturnPoppedCard : TABLE_EVENTS.hostReturnPublicCard;
 
         this.time.delayedCall(500, () => {
             if (!card.active) return;
@@ -985,7 +987,11 @@ class TableScene extends Phaser.Scene {
                 onComplete: () => {
                     card.destroy();
                     for (const cd of allCardData) {
-                      emitTableEvent(returnEvent, { cardData: cd as Card });
+                      if (dragSource === 'deck') {
+                        emitHostCommand('returnPoppedDeckCard', { cardData: cd as Card });
+                      } else {
+                        emitHostCommand('returnPublicCardToTable', { cardData: cd as Card });
+                      }
                     }
                 }
             });
