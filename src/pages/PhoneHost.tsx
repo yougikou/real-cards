@@ -8,6 +8,8 @@ import { useLocale, t } from '../i18n/LocaleProvider';
 import type { Locale } from '../i18n/LocaleProvider';
 import dict from '../i18n/translations';
 
+type DangerAction = 'clear' | 'reset';
+
 function getStatusLabel(locale: Locale, status: string) {
   if (status === 'ready') return t(locale, dict, 'host.statusReady');
   if (status === 'starting') return t(locale, dict, 'host.statusStarting');
@@ -34,7 +36,7 @@ export default function PhoneHost() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [draftName, setDraftName] = useState(searchParams.get('name') || '');
   const [panelOpen, setPanelOpen] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [dangerAction, setDangerAction] = useState<DangerAction | null>(null);
   const [seatPlayerId, setSeatPlayerId] = useState<string | null>(null);
 
   const playerName = searchParams.get('name') || '';
@@ -59,6 +61,27 @@ export default function PhoneHost() {
     return activeHostPendingAction.type === 'UNDO'
       ? t(locale, dict, 'host.confirmUndoRequest', { name: requester })
       : t(locale, dict, 'host.confirmMoveRequest', { name: requester });
+  };
+
+  const dangerActionText = () => {
+    if (dangerAction === 'clear') {
+      return t(locale, dict, 'host.confirmClearTable', { n: String(playStackCount) });
+    }
+    if (dangerAction === 'reset') {
+      return t(locale, dict, 'host.confirmResetGame');
+    }
+    return '';
+  };
+
+  const confirmDangerAction = () => {
+    const action = dangerAction;
+    setDangerAction(null);
+    if (action === 'clear') {
+      clearTableToDiscard();
+    } else if (action === 'reset') {
+      resetGame();
+      playShuffleSound();
+    }
   };
 
   const confirmName = () => {
@@ -206,14 +229,14 @@ export default function PhoneHost() {
 
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={clearTableToDiscard}
+                  onClick={() => setDangerAction('clear')}
                   disabled={playStackCount === 0}
                   className="rounded-xl border border-rose-300/20 bg-rose-400/15 px-3 py-3 text-sm font-black text-rose-100 disabled:opacity-35"
                 >
                   {t(locale, dict, 'tableConfig.playStackAction')}
                 </button>
                 <button
-                  onClick={() => setConfirmReset(true)}
+                  onClick={() => setDangerAction('reset')}
                   className="rounded-xl border border-amber-300/20 bg-amber-400/15 px-3 py-3 text-sm font-black text-amber-100"
                 >
                   {t(locale, dict, 'host.resetShuffle')}
@@ -284,21 +307,18 @@ export default function PhoneHost() {
         </div>
       )}
 
-      {confirmReset && (
+      {dangerAction && (
         <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl border border-amber-300/20 bg-slate-950 p-5 text-center text-white">
-            <div className="mb-5 text-base font-black">{t(locale, dict, 'phoneHost.resetConfirm')}</div>
+            <div className="mb-2 text-xs font-black uppercase tracking-[0.22em] text-rose-200">{t(locale, dict, 'host.dangerConfirm')}</div>
+            <div className="mb-5 text-base font-black">{dangerActionText()}</div>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmReset(false)} className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black">
+              <button onClick={() => setDangerAction(null)} className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black">
                 {t(locale, dict, 'client.cancel')}
               </button>
               <button
-                onClick={() => {
-                  setConfirmReset(false);
-                  resetGame();
-                  playShuffleSound();
-                }}
-                className="flex-1 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950"
+                onClick={confirmDangerAction}
+                className="flex-1 rounded-xl bg-rose-400 px-4 py-3 text-sm font-black text-slate-950"
               >
                 {t(locale, dict, 'client.confirmUndo')}
               </button>

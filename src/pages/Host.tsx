@@ -35,6 +35,8 @@ const LOCALES: { code: Locale; label: string }[] = [
   { code: 'en', label: 'English' },
 ];
 
+type DangerAction = 'clear' | 'reset';
+
 function getStatusStyles(status: keyof typeof STATUS_STYLES) {
   return STATUS_STYLES[status] ?? STATUS_STYLES.starting;
 }
@@ -79,8 +81,10 @@ function DesktopHost() {
 
   const statusStyles = getStatusStyles(status);
   const playerCount = Object.keys(gameState.players).length;
+  const playStackCount = gameState.playStack.flat().length;
   const [panelOpen, setPanelOpen] = useState(true);
   const [seatAssignmentPlayerId, setSeatAssignmentPlayerId] = useState<string | null>(null);
+  const [dangerAction, setDangerAction] = useState<DangerAction | null>(null);
   const hostPendingActions = Object.values(gameState.pendingActions).filter(action => action.confirmationMode === 'host');
   const activeHostPendingAction = hostPendingActions[0];
 
@@ -115,6 +119,27 @@ function DesktopHost() {
     return activeHostPendingAction.type === 'UNDO'
       ? t(locale, dict, 'host.confirmUndoRequest', { name: requester })
       : t(locale, dict, 'host.confirmMoveRequest', { name: requester });
+  };
+
+  const dangerActionText = () => {
+    if (dangerAction === 'clear') {
+      return t(locale, dict, 'host.confirmClearTable', { n: String(playStackCount) });
+    }
+    if (dangerAction === 'reset') {
+      return t(locale, dict, 'host.confirmResetGame');
+    }
+    return '';
+  };
+
+  const confirmDangerAction = () => {
+    const action = dangerAction;
+    setDangerAction(null);
+    if (action === 'clear') {
+      clearTableToDiscard();
+    } else if (action === 'reset') {
+      resetGame();
+      playShuffleSound();
+    }
   };
 
   useEffect(() => {
@@ -178,6 +203,29 @@ function DesktopHost() {
                     {t(locale, dict, 'host.approve')}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {dangerAction && (
+          <div className="pointer-events-auto absolute inset-0 z-[72] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl border border-rose-300/25 bg-slate-950 p-5 text-center shadow-[0_28px_90px_rgba(0,0,0,0.62)]">
+              <div className="mb-2 text-xs font-black uppercase tracking-[0.22em] text-rose-200">{t(locale, dict, 'host.dangerConfirm')}</div>
+              <div className="mb-5 text-base font-black leading-relaxed text-white">{dangerActionText()}</div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDangerAction(null)}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white transition-all active:scale-[0.98]"
+                >
+                  {t(locale, dict, 'client.cancel')}
+                </button>
+                <button
+                  onClick={confirmDangerAction}
+                  className="flex-1 rounded-xl bg-rose-400 px-4 py-3 text-sm font-black text-slate-950 transition-all active:scale-[0.98]"
+                >
+                  {t(locale, dict, 'client.confirmUndo')}
+                </button>
               </div>
             </div>
           </div>
@@ -378,10 +426,10 @@ function DesktopHost() {
 
 
 {/* Clear play stack - below center area */}
-          {gameState.playStack.flat().length > 0 && (
+          {playStackCount > 0 && (
             <div className="pointer-events-auto absolute left-1/2 z-10 -translate-x-1/2" style={{ bottom: '22%' }}>
               <button
-                onClick={clearTableToDiscard}
+                onClick={() => setDangerAction('clear')}
                 className="rounded-lg border border-rose-200/35 bg-rose-950/90 px-3 py-2 text-xs font-bold text-rose-100 shadow-[0_8px_24px_rgba(0,0,0,0.48)] transition-all hover:bg-rose-900 active:scale-95"
               >
                 {t(locale, dict, 'tableConfig.playStackAction')}
@@ -392,7 +440,7 @@ function DesktopHost() {
           {/* Reset shuffle - bottom left corner gap */}
           <div className="pointer-events-auto absolute bottom-2 left-2 z-10 flex h-14 w-14 items-center justify-center">
             <button
-              onClick={() => { resetGame(); playShuffleSound(); }}
+              onClick={() => setDangerAction('reset')}
               aria-label={t(locale, dict, 'host.resetShuffle')}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-rose-200/40 bg-gradient-to-b from-rose-950 to-red-900 text-base font-bold text-white shadow-[0_8px_30px_rgba(0,0,0,0.48)] transition-transform hover:from-rose-900 hover:to-red-800 active:scale-95"
             >

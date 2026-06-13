@@ -279,6 +279,15 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
     };
   }, []);
 
+  useEffect(() => {
+    if (!showEventModal) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowEventModal(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showEventModal]);
+
   const status = isPreview ? 'connected' : realStatus;
   const hand = isPreview ? localHand : realHand;
   const activeGameState = isPreview ? localGameState : realGameState;
@@ -797,19 +806,19 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
           try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
           resetHandDragState();
         }}
-        className={`relative w-24 h-36 rounded-[0.625rem] bg-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] border border-slate-300 flex flex-col justify-between p-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-400/80 touch-none ${isSelected ? 'ring-4 ring-amber-400 z-30' : ''} ${hasSelection && !isSelected ? 'opacity-60 saturate-50' : ''} ${isRecentlyDrawn ? 'ring-4 ring-emerald-400 shadow-[0_0_24px_rgba(34,197,94,0.45)] z-20' : ''} ${dragActive && isSelected ? 'opacity-40 scale-95' : ''} ${isReorderingHand && isSelected ? 'shadow-[0_0_28px_rgba(251,191,36,0.45)]' : ''} ${isReorderTarget ? 'outline outline-2 outline-cyan-300 outline-offset-4' : ''}`}
+        className={`relative w-24 h-36 rounded-[0.625rem] bg-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] border border-slate-300 flex flex-col justify-between p-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber-400/80 touch-none ${isSelected ? 'ring-4 ring-inset ring-amber-400 z-30' : ''} ${hasSelection && !isSelected ? 'opacity-60 saturate-50' : ''} ${isRecentlyDrawn ? 'ring-4 ring-inset ring-emerald-400 shadow-[0_0_24px_rgba(34,197,94,0.45)] z-20' : ''} ${dragActive && isSelected ? 'opacity-40 scale-95' : ''} ${isReorderingHand && isSelected ? 'shadow-[0_0_28px_rgba(251,191,36,0.45)]' : ''} ${isReorderTarget ? 'outline outline-2 outline-cyan-300 outline-offset-4' : ''}`}
         style={{
           transform: `translateY(${fanLift + (isSelected ? -18 : 0)}px) rotate(${fanTilt}deg) scale(${isSelected ? 1.06 : hasSelection ? 0.96 : 1})`,
           zIndex: isSelected ? 40 : 10 + index,
         }}
       >
         {isSelected && (
-          <div className="absolute -top-3 -right-3 h-8 w-8 rounded-full bg-amber-400 text-slate-950 border-2 border-slate-950 flex items-center justify-center text-sm font-black shadow-lg">
+          <div className="absolute right-1 top-1 h-7 w-7 rounded-full bg-amber-400 text-slate-950 border-2 border-white flex items-center justify-center text-xs font-black shadow-lg">
             {selectedCards.indexOf(card.id) + 1}
           </div>
         )}
         {isRecentlyDrawn && !isSelected && (
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black shadow-lg">
+          <div className="absolute left-1/2 top-1 -translate-x-1/2 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black shadow-lg">
             NEW
           </div>
         )}
@@ -1243,7 +1252,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
 
             {/* Other players compact row */}
             {Object.keys(activeGameState.players).length > 1 && (
-              <div className="flex shrink-0 gap-1.5 overflow-x-hidden">
+              <div className="flex shrink-0 gap-1.5 overflow-x-auto scrollbar-none px-1 pb-1 touch-pan-x">
                 {Object.values(activeGameState.players)
                   .filter(player => player.id !== peerId)
                   .map(player => (
@@ -1303,7 +1312,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
         )}
 
         <div
-          className={`min-h-0 flex-none h-[14.5rem] flex flex-col`}
+          className="min-h-0 flex-none h-[15.5rem] flex flex-col overflow-visible"
         >
           <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-1">
             <div>
@@ -1368,8 +1377,8 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
           </div>
 
           {hand.length > 0 ? (
-            <div ref={handScrollerRef} className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 touch-pan-x">
-              <div className="flex h-full min-w-max items-end gap-0 px-2 py-2">
+            <div ref={handScrollerRef} className="min-h-0 flex-1 overflow-x-auto overflow-y-visible scrollbar-none touch-pan-x">
+              <div className="flex h-full min-w-max items-end gap-0 px-4 pb-5 pt-7">
                 {displayHand.map((card, index) => (
                   <div
                     key={card.id}
@@ -1412,13 +1421,15 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
 
       {/* Event log modal */}
       {showEventModal && (
-        <div className="absolute inset-0 z-50 flex flex-col bg-slate-950/98 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/8">
+        <div className="absolute inset-0 z-[80] flex flex-col bg-slate-950/98 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/8 bg-slate-950/95 px-4 pb-3 pt-3 shadow-[0_12px_30px_rgba(0,0,0,0.22)]" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
             <div className="text-sm font-black text-white">{t(locale, dict, 'event.modalTitle')}</div>
             <button
               onClick={() => setShowEventModal(false)}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black text-white/70 active:scale-[0.95] transition-all"
+              aria-label={t(locale, dict, 'event.close')}
+              className="flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white active:scale-[0.95] transition-all"
             >
+              <span aria-hidden="true" className="text-base leading-none">X</span>
               {t(locale, dict, 'event.close')}
             </button>
           </div>
@@ -1437,6 +1448,14 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
                 <span className="text-xs text-white/30 italic">{t(locale, dict, 'event.empty')}</span>
               </div>
             )}
+          </div>
+          <div className="shrink-0 border-t border-white/8 bg-slate-950/95 px-4 pt-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
+            <button
+              onClick={() => setShowEventModal(false)}
+              className="w-full rounded-xl border border-white/10 bg-white/8 px-4 py-3 text-sm font-black text-white active:scale-[0.98] transition-all"
+            >
+              {t(locale, dict, 'event.close')}
+            </button>
           </div>
         </div>
       )}
