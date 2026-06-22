@@ -69,6 +69,7 @@ function DesktopHost() {
     resetGame,
     clearTableToDiscard,
     assignSeat,
+    removeOfflinePlayer,
     approvePendingAction,
     rejectPendingAction,
   } = useHost();
@@ -110,7 +111,17 @@ function DesktopHost() {
     if (latestEvent.type === 'SEAT_ASSIGNED') {
       return `${latestEvent.playerName ?? ''} -> ${seatLabel(latestEvent.seatId)}`;
     }
+    if (latestEvent.type === 'PLAYER_REMOVED') {
+      return t(locale, dict, 'event.playerRemoved', { player: latestEvent.playerName ?? '', n: String(latestEvent.count ?? 0) });
+    }
     return `${latestEvent.type}${latestEvent.playerName ? ` · ${latestEvent.playerName}` : ''}${latestEvent.count ? ` · ${latestEvent.count}` : ''}`;
+  };
+
+  const moveText = (move: (typeof gameState.moveLedger)[number]) => {
+    const actor = move.actorName || move.targetName || t(locale, dict, 'host.player');
+    const cardCount = move.cards.length;
+    const undone = move.undone ? ` · ${t(locale, dict, 'host.moveUndone')}` : '';
+    return `${move.action} · ${actor} · ${move.from} → ${move.to} · ${cardCount}${undone}`;
   };
 
   const pendingActionText = () => {
@@ -321,7 +332,7 @@ function DesktopHost() {
                               </div>
                               <div className="shrink-0 text-[10px] font-semibold text-white/45">{seatLabel(player.seatId)}</div>
                             </div>
-                            <div className="grid grid-cols-[1fr_auto] gap-2">
+	                        <div className="grid grid-cols-[1fr_auto] gap-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -336,28 +347,52 @@ function DesktopHost() {
                               >
                                 {seatAssignmentPlayerId === player.id ? t(locale, dict, 'host.cancelSeatAssign') : t(locale, dict, 'host.assignSeat')}
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  assignSeat(player.id, undefined);
-                                  if (seatAssignmentPlayerId === player.id) setSeatAssignmentPlayerId(null);
+	                              <button
+	                                type="button"
+	                                onClick={() => {
+	                                  assignSeat(player.id, undefined);
+	                                  if (seatAssignmentPlayerId === player.id) setSeatAssignmentPlayerId(null);
                                 }}
                                 disabled={!player.seatId}
                                 className="rounded-lg border border-white/10 bg-slate-900 px-2 py-1.5 text-xs font-black text-white transition-all active:scale-[0.98] disabled:opacity-35"
                               >
-                                {t(locale, dict, 'host.releaseSeat')}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+	                                {t(locale, dict, 'host.releaseSeat')}
+	                              </button>
+	                            </div>
+                              {player.online === false && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    removeOfflinePlayer(player.id);
+                                    if (seatAssignmentPlayerId === player.id) setSeatAssignmentPlayerId(null);
+                                  }}
+                                  className="mt-2 w-full rounded-lg border border-rose-300/20 bg-rose-400/15 px-2 py-1.5 text-xs font-black text-rose-100 transition-all active:scale-[0.98]"
+                                >
+                                  {t(locale, dict, 'host.kickOffline')}
+                                </button>
+                              )}
+	                          </div>
+	                        ))}
+	                      </div>
                       {seatAssignmentPlayer && (
                         <div className="mt-3 rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100">
                           {t(locale, dict, 'host.seatAssignHint', { name: seatAssignmentPlayer.name })}
+	                        </div>
+	                      )}
+                      {gameState.moveLedger.length > 0 && (
+                        <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
+                          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">{t(locale, dict, 'host.ledgerTimeline')}</div>
+                          <div className="grid max-h-32 gap-1 overflow-y-auto pr-1">
+                            {gameState.moveLedger.slice(-6).reverse().map(move => (
+                              <div key={move.id} className="truncate rounded-lg bg-white/[0.04] px-2 py-1.5 font-mono text-[10px] text-white/65">
+                                {moveText(move)}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
-                    </div>
-                  )}
+	                    </div>
+	                  )}
                 </div>
               </div>
 

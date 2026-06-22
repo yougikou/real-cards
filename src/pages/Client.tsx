@@ -59,7 +59,7 @@ const MOCK_HAND: Card[] = [
 ];
 
 type PreviewActionHistoryEntry =
-  | { type: 'DRAW'; payload: { card: Card } }
+  | { type: 'DRAW'; payload: { cards: Card[] } }
   | { type: 'PLAY'; payload: { cards: Card[] } }
   | { type: 'RETURN'; payload: { cards: Card[] } }
   | { type: 'DRAW_FROM_OTHER'; payload: { card: Card; targetPlayerId: string } };
@@ -236,6 +236,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
   const [targetActionPlayerId, setTargetActionPlayerId] = useState<string | null>(null);
   const [stolenCardResult, setStolenCardResult] = useState<Card | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [drawCount, setDrawCount] = useState(1);
   const [recentlyDrawnCardIds, setRecentlyDrawnCardIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showUndoConfirm, setShowUndoConfirm] = useState(false);
@@ -320,6 +321,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
       case 'HOST_TAKE_FROM_TABLE': return t(locale, dict, 'event.hostTakenFromTable', { cards: cardStr });
       case 'HOST_RETURN_TO_TABLE': return t(locale, dict, 'event.hostReturnedToTable', { cards: cardStr });
       case 'SEAT_ASSIGNED': return t(locale, dict, 'event.seatAssigned', { player: pn, seat: event.seatId || t(locale, dict, 'host.unseated') });
+      case 'PLAYER_REMOVED': return t(locale, dict, 'event.playerRemoved', { player: pn, n: String(count) });
       default: return '';
     }
   };
@@ -500,6 +502,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
 
   const handleDrawAction = () => {
     if (isDrawing) return;
+    const count = Math.max(1, Math.min(drawCount, activeGameState?.deckCount ?? drawCount));
 
     setIsDrawing(true);
     window.setTimeout(() => setIsDrawing(false), 300);
@@ -509,19 +512,21 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
 
     if (isPreview) {
       if (localGameState.deckCount > 0) {
-        previewCardIdRef.current += 1;
-        const newCard: Card = { id: `mock-drawn-${previewCardIdRef.current}`, suit: 'spades', rank: '7' };
-        setLocalHand(prev => [...prev, newCard]);
-        setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount - 1 }));
-        setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'DRAW', playerName, count: 1 }]);
-        previewActionHistoryRef.current.push({ type: 'DRAW', payload: { card: newCard } });
+        const drawnCards = Array.from({ length: Math.min(count, localGameState.deckCount) }, () => {
+          previewCardIdRef.current += 1;
+          return { id: `mock-drawn-${previewCardIdRef.current}`, suit: 'spades' as const, rank: '7' as const };
+        });
+        setLocalHand(prev => [...prev, ...drawnCards]);
+        setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount - drawnCards.length }));
+        setLocalEventLog(prev => [...prev, { timestamp: eventTimestamp(), type: 'DRAW', playerName, count: drawnCards.length }]);
+        previewActionHistoryRef.current.push({ type: 'DRAW', payload: { cards: drawnCards } });
         setPreviewUndoCount(previewActionHistoryRef.current.length);
-        showToast(t(locale, dict, 'client.drawnToast'));
+        showToast(t(locale, dict, 'client.plusCards', { n: String(drawnCards.length) }));
       } else {
         showToast(t(locale, dict, 'client.deckEmpty'));
       }
     } else {
-      drawCard(1);
+      drawCard(count);
     }
   };
 
@@ -613,8 +618,8 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
 
       switch (lastAction.type) {
         case 'DRAW':
-          setLocalHand(prev => prev.filter(c => c.id !== lastAction.payload.card.id));
-          setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount + 1 }));
+          setLocalHand(prev => prev.filter(c => !lastAction.payload.cards.some(card => card.id === c.id)));
+          setLocalGameState(prev => ({ ...prev, deckCount: prev.deckCount + lastAction.payload.cards.length }));
           break;
         case 'PLAY':
           setLocalHand(prev => [...prev, ...lastAction.payload.cards]);
@@ -1275,23 +1280,39 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
         {/* Deck & discard pile row */}
         {activeGameState && (
           <div ref={deckAreaRef} className="shrink-0 flex items-center gap-3 px-2">
-            <button
-              onClick={handleDrawAction}
-              disabled={isDrawing}
+            <div
               className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-4 py-2.5 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 ${
                 dragActive && dragOverReturnTopArea
                   ? 'border-amber-400/60 bg-amber-500/20 shadow-[0_0_40px_rgba(251,191,36,0.2)]'
                   : 'border-white/8 bg-slate-950/60'
               }`}
             >
-              <div className="flex items-center gap-2">
+              <button
+                onClick={handleDrawAction}
+                disabled={isDrawing}
+                className="flex w-full items-center justify-center gap-2 rounded-lg px-2 py-1 transition-all active:scale-[0.98] disabled:opacity-50"
+              >
                 <div className="text-xs font-black text-white">{t(locale, dict, 'client.drawFromDeck')}</div>
                 <div className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-black text-white">{activeGameState.deckCount}</div>
+              </button>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 5].map(count => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setDrawCount(count)}
+                    className={`min-w-7 rounded-md px-1.5 py-0.5 text-[10px] font-black ${
+                      drawCount === count ? 'bg-amber-300 text-slate-950' : 'bg-white/8 text-white/65'
+                    }`}
+                  >
+                    {count}
+                  </button>
+                ))}
               </div>
               <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-amber-200/75">
                 {dragActive ? t(locale, dict, 'client.releaseReturnTop') : t(locale, dict, 'client.dragReturnTop')}
               </div>
-            </button>
+            </div>
             <div
               className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-4 py-2.5 shadow-lg transition-all ${
                 dragActive && dragOverReturnBottomArea
