@@ -28,6 +28,7 @@ export default function PhoneHost() {
     clearTableToDiscard,
     dealCardsToPlayer,
     assignSeat,
+    removeOfflinePlayer,
     approvePendingAction,
     rejectPendingAction,
     seatIds,
@@ -277,6 +278,30 @@ export default function PhoneHost() {
                             {t(locale, dict, 'host.releaseSeat')}
                           </button>
                         </div>
+                        {player.online === false && (
+                          <button
+                            onClick={() => {
+                              removeOfflinePlayer(player.id);
+                              if (seatPlayerId === player.id) setSeatPlayerId(null);
+                            }}
+                            className="mt-2 w-full rounded-lg border border-rose-300/20 bg-rose-400/15 px-2 py-1.5 text-xs font-black text-rose-100"
+                          >
+                            {t(locale, dict, 'host.kickOffline')}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {gameState.moveLedger.length > 0 && (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/45">{t(locale, dict, 'host.ledgerTimeline')}</div>
+                  <div className="grid max-h-28 gap-1 overflow-y-auto">
+                    {gameState.moveLedger.slice(-5).reverse().map(move => (
+                      <div key={move.id} className="truncate rounded-lg bg-slate-900/70 px-2 py-1.5 font-mono text-[10px] text-white/65">
+                        {move.action} · {move.actorName || move.targetName || t(locale, dict, 'host.player')} · {move.from} → {move.to} · {move.cards.length}
                       </div>
                     ))}
                   </div>

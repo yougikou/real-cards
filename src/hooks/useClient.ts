@@ -1,6 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
 import Peer, { type DataConnection } from 'peerjs';
-import type { Card, GameState, ClientAction, HostMessage, PendingAction } from '../types';
+import type { Card, GameState, ClientAction, HostMessage, MoveLedgerEntry, PendingAction } from '../types';
+
+const PUBLIC_CONTAINERS = new Set(['deck', 'deckTop', 'deckBottom', 'playStack', 'discardPile']);
+
+function getUndoConfirmation(move: MoveLedgerEntry) {
+  if (move.undoConfirmationMode) return move.undoConfirmationMode;
+  if (move.counterpartyPlayerId) return 'counterparty';
+  if (PUBLIC_CONTAINERS.has(move.from) || PUBLIC_CONTAINERS.has(move.to)) return 'host';
+  return 'none';
+}
+
+function countUndoableMoves(state: GameState, playerName: string) {
+  return state.moveLedger.filter(move => (
+    !move.undone &&
+    !move.undoOf &&
+    move.reversible !== false &&
+    getUndoConfirmation(move) !== 'locked' &&
+    move.actorName === playerName
+  )).length;
+}
 
 export function useClient(hostId: string, playerName: string) {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'failed' | 'retrying' | 'reconnecting'>('connecting');
@@ -12,7 +31,6 @@ export function useClient(hostId: string, playerName: string) {
   const [peerId, setPeerId] = useState<string | null>(null);
   const [undoableActionCount, setUndoableActionCount] = useState(0);
   const [pendingConfirmations, setPendingConfirmations] = useState<PendingAction[]>([]);
-  const undoableActionCountRef = useRef(0);
 
   const connRef = useRef<DataConnection | null>(null);
 
@@ -55,6 +73,7 @@ export function useClient(hostId: string, playerName: string) {
         switch (message.type) {
           case 'STATE_UPDATE':
             setGameState(message.payload);
+            setUndoableActionCount(countUndoableMoves(message.payload, playerName));
             break;
           case 'RECEIVE_CARDS':
             setHand(prev => {
@@ -130,40 +149,41 @@ export function useClient(hostId: string, playerName: string) {
 
   const sendAction = (action: ClientAction) => {
     if (connRef.current && status === 'connected') {
-      connRef.current.send(action);
+      try {
+        connRef.current.send(action);
+        return true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown send failure';
+        setStatus('failed');
+        setError(`Action failed to send. Please retry or resync: ${message}`);
+        return false;
+      }
     }
-  };
-
-  const trackAction = () => {
-    undoableActionCountRef.current += 1;
-    setUndoableActionCount(undoableActionCountRef.current);
+    setError('Action was not sent because the client is not connected.');
+    return false;
   };
 
   const drawCard = (count: number = 1) => {
-    trackAction();
     sendAction({ type: 'DRAW', payload: { count } });
   };
 
   const playCards = (cards: Card[]) => {
-    // Optimistic UI update
-    setHand(prev => prev.filter(c => !cards.map(sc => sc.id).includes(c.id)));
-    trackAction();
-    sendAction({ type: 'PLAY', payload: { cards } });
+    if (sendAction({ type: 'PLAY', payload: { cards } })) {
+      setHand(prev => prev.filter(c => !cards.map(sc => sc.id).includes(c.id)));
+    }
   };
 
   const returnCards = (cards: Card[], toTop: boolean = true) => {
-    setHand(prev => prev.filter(c => !cards.map(sc => sc.id).includes(c.id)));
-    trackAction();
-    sendAction({ type: 'RETURN', payload: { cards, toTop } });
+    if (sendAction({ type: 'RETURN', payload: { cards, toTop } })) {
+      setHand(prev => prev.filter(c => !cards.map(sc => sc.id).includes(c.id)));
+    }
   };
 
   const drawFromOther = (targetPlayerId: string, cardId: string) => {
-    trackAction();
     sendAction({ type: 'DRAW_FROM_OTHER', payload: { targetPlayerId, cardId } });
   };
 
   const giveCards = (targetPlayerId: string, cards: Card[]) => {
-    trackAction();
     sendAction({ type: 'GIVE_CARD', payload: { targetPlayerId, cards } });
   };
 
@@ -172,7 +192,7 @@ export function useClient(hostId: string, playerName: string) {
   };
 
   const undoLastAction = () => {
-    if (undoableActionCountRef.current === 0) return;
+    if (undoableActionCount === 0) return;
     sendAction({ type: 'UNDO_LAST_ACTION', payload: {} });
   };
 

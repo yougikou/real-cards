@@ -283,6 +283,41 @@ export function useHost() {
     });
   };
 
+  const removeOfflinePlayer = (playerId: string) => {
+    const player = gameStateRef.current.players[playerId];
+    if (!player || player.online !== false) return;
+
+    connectionsRef.current[playerId]?.close();
+    delete connectionsRef.current[playerId];
+    delete clientActionHistoryRef.current[playerId];
+    delete nameToPeerIdRef.current[player.name];
+
+    const removedHand = getPlayerHand(serverStateRef.current, playerId);
+    if (removedHand.length > 0) {
+      returnCardsToDeck(serverStateRef.current, removedHand, false);
+    }
+    delete serverStateRef.current.playerHands[playerId];
+
+    updateStateAndBroadcast(prev => {
+      const players = { ...prev.players };
+      delete players[playerId];
+      const pendingActions = Object.fromEntries(
+        Object.entries(prev.pendingActions).filter(([, action]) => (
+          action.requestedByPlayerId !== playerId &&
+          action.counterpartyPlayerId !== playerId
+        )),
+      );
+      return appendEvent(
+        withDeckCount({
+          ...prev,
+          players,
+          pendingActions,
+        }, serverStateRef.current),
+        { timestamp: Date.now(), type: 'PLAYER_REMOVED' as const, playerName: player.name, count: removedHand.length },
+      );
+    });
+  };
+
   const requestPendingAction = (pendingAction: PendingAction) => {
     updateStateAndBroadcast(prev => addPendingAction(prev, pendingAction));
     if (pendingAction.confirmationMode === 'counterparty' && pendingAction.counterpartyPlayerId) {
@@ -1029,6 +1064,7 @@ export function useHost() {
     clearTableToDiscard,
     dealCardsToPlayer,
     assignSeat,
+    removeOfflinePlayer,
     approvePendingAction,
     rejectPendingAction,
     seatIds: SEAT_IDS,

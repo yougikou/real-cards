@@ -30,7 +30,8 @@ export type GameEventType =
   | 'HOST_DISCARD'
   | 'HOST_TAKE_FROM_TABLE'
   | 'HOST_RETURN_TO_TABLE'
-  | 'SEAT_ASSIGNED';
+  | 'SEAT_ASSIGNED'
+  | 'PLAYER_REMOVED';
 
 export interface GameEvent {
   timestamp: number;

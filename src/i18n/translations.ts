@@ -4,6 +4,9 @@ const dict: Translations = {
   zh: {
     'app.title': '实卡沙盒',
     'app.joinPrompt': '请输入房间号后加入游戏。',
+    'pwa.updateTitle': '有新版本',
+    'pwa.updateBody': '刷新后使用最新牌桌代码，避免旧缓存影响联机。',
+    'pwa.updateNow': '更新',
 
     'home.hostGame': '创建游戏',
     'home.createTable': '创建桌面（平板）',
@@ -77,6 +80,9 @@ const dict: Translations = {
     'host.releaseSeat': '释放',
     'host.seatAssignHint': '正在为 {name} 分配座位。关闭面板后点击桌边座位，已占座会自动交换。',
     'host.tapSeatForPlayer': '点击桌边座位，为 {name} 入座或交换座位',
+    'host.kickOffline': '移除离线玩家',
+    'host.ledgerTimeline': '牌流时间线',
+    'host.moveUndone': '已撤销',
 
     'phoneHost.mode': '手机房主',
     'phoneHost.nameTitle': '先加入自己的房间',
@@ -182,6 +188,7 @@ const dict: Translations = {
     'event.hostTakenFromTable': '主机移出了 {cards}',
     'event.hostReturnedToTable': '主机放回了 {cards}',
     'event.seatAssigned': '{player} 分配到 {seat}',
+    'event.playerRemoved': '{player} 已移出房间，{n} 张手牌回到牌堆',
     'event.reset': '游戏已重置',
     'event.andMore': '等{n}张',
 
@@ -210,6 +217,9 @@ const dict: Translations = {
   ja: {
     'app.title': 'リアルカードサンドボックス',
     'app.joinPrompt': 'ルームコードを入力してゲームに参加してください。',
+    'pwa.updateTitle': '新しいバージョン',
+    'pwa.updateBody': '最新のテーブルコードに更新して、古いキャッシュの影響を避けます。',
+    'pwa.updateNow': '更新',
 
     'home.hostGame': 'ゲームを作成',
     'home.createTable': 'テーブルを作成（タブレット）',
@@ -283,6 +293,9 @@ const dict: Translations = {
     'host.releaseSeat': '解除',
     'host.seatAssignHint': '{name} の席を割り当て中。パネルを閉じてテーブル端の席をタップ。使用中の席は自動で交換されます。',
     'host.tapSeatForPlayer': 'テーブル端の席をタップして {name} を着席または交換',
+    'host.kickOffline': 'オフラインを削除',
+    'host.ledgerTimeline': 'カード移動履歴',
+    'host.moveUndone': '取り消し済み',
 
     'phoneHost.mode': 'スマホホスト',
     'phoneHost.nameTitle': '自分のルームに参加',
@@ -388,6 +401,7 @@ const dict: Translations = {
     'event.hostTakenFromTable': 'ホストが {cards} をテーブルから移動',
     'event.hostReturnedToTable': 'ホストが {cards} をテーブルに戻した',
     'event.seatAssigned': '{player} を {seat} に割り当て',
+    'event.playerRemoved': '{player} をルームから削除し、{n} 枚をデッキに戻しました',
     'event.reset': 'ゲームリセット',
     'event.andMore': 'など{n}枚',
 
@@ -416,6 +430,9 @@ const dict: Translations = {
   en: {
     'app.title': 'Real Cards Sandbox',
     'app.joinPrompt': 'Please enter a room code to join a game.',
+    'pwa.updateTitle': 'Update available',
+    'pwa.updateBody': 'Refresh to use the latest table code and avoid stale multiplayer cache.',
+    'pwa.updateNow': 'Update',
 
     'home.hostGame': 'Host a Game',
     'home.createTable': 'Create Table (Tablet)',
@@ -489,6 +506,9 @@ const dict: Translations = {
     'host.releaseSeat': 'Release',
     'host.seatAssignHint': 'Assigning a seat for {name}. Close this panel and tap a table-edge seat; occupied seats swap automatically.',
     'host.tapSeatForPlayer': 'Tap a table-edge seat to seat or swap {name}',
+    'host.kickOffline': 'Remove offline player',
+    'host.ledgerTimeline': 'Move timeline',
+    'host.moveUndone': 'undone',
 
     'phoneHost.mode': 'Phone Host',
     'phoneHost.nameTitle': 'Join your own room first',
@@ -594,6 +614,7 @@ const dict: Translations = {
     'event.hostTakenFromTable': 'Host removed {cards}',
     'event.hostReturnedToTable': 'Host returned {cards}',
     'event.seatAssigned': '{player} assigned to {seat}',
+    'event.playerRemoved': '{player} was removed; {n} hand cards returned to deck',
     'event.reset': 'Game reset',
     'event.andMore': '+{n} more',
 
