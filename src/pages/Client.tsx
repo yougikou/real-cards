@@ -8,6 +8,7 @@ import { playReturnSound } from '../utils/audio/returnCard';
 import { useLocale, t } from '../i18n/LocaleProvider';
 import dict from '../i18n/translations';
 import type { Locale } from '../i18n/LocaleProvider';
+import { DEFAULT_GAME_SETTINGS } from '../config/tableConfig';
 
 const LOCALES: { code: Locale; label: string }[] = [
   { code: 'zh', label: '中文' },
@@ -46,6 +47,7 @@ const RANK_ORDER: Record<Card['rank'], number> = {
   Q: 11,
   K: 12,
   JOKER: 13,
+  CUSTOM: 14,
 };
 
 const MOCK_HAND: Card[] = [
@@ -69,6 +71,7 @@ function eventTimestamp() {
 }
 
 const MOCK_GAME_STATE: GameState = {
+  gameSettings: DEFAULT_GAME_SETTINGS,
   deckCount: 42,
   discardPile: [],
   playStack: [
@@ -96,7 +99,22 @@ function cardTone(card: Card) {
 }
 
 function cardToStr(card: Card) {
+  if (card.title) return card.title;
   return `${SUIT_SYMBOLS[card.suit]}${card.rank}`;
+}
+
+function getCardCornerLabel(card: Card) {
+  if (!card.title) return card.rank;
+  return card.category ? card.category.slice(0, 4).toUpperCase() : 'CARD';
+}
+
+function getCardCenterLabel(card: Card) {
+  return card.title ?? SUIT_SYMBOLS[card.suit];
+}
+
+function getCardSubLabel(card: Card) {
+  if (card.title) return card.tags?.slice(0, 2).join(' / ') ?? card.category ?? '';
+  return SUIT_SYMBOLS[card.suit];
 }
 
 function formatCardList(cards: Card[], max = Infinity, andMoreTpl = '+{n} more') {
@@ -292,6 +310,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
   const status = isPreview ? 'connected' : realStatus;
   const hand = isPreview ? localHand : realHand;
   const activeGameState = isPreview ? localGameState : realGameState;
+  const activeGameSettings = activeGameState?.gameSettings ?? DEFAULT_GAME_SETTINGS;
   const eventLog = isPreview ? localEventLog : (activeGameState?.eventLog || []);
   const activePendingConfirmation = isPreview ? null : pendingConfirmations[0] ?? null;
 
@@ -700,6 +719,10 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
     const isReorderTarget = reorderTargetCardId === card.id;
     const tone = cardTone(card);
     const suitIcon = SUIT_SYMBOLS[card.suit];
+    const cornerLabel = getCardCornerLabel(card);
+    const centerLabel = getCardCenterLabel(card);
+    const subLabel = getCardSubLabel(card);
+    const isCustomCard = Boolean(card.title);
     const spread = total > 1 ? (index / (total - 1)) * 2 - 1 : 0;
     const fanTilt = spread * 7;
     const fanLift = Math.abs(spread) * 10;
@@ -830,16 +853,21 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
 
         <div className="flex items-start">
           <div className="flex flex-col items-start">
-            <div className={`text-lg font-black leading-none ${tone}`}>{card.rank}</div>
+            <div className={`${isCustomCard ? 'max-w-[4.25rem] truncate text-[10px]' : 'text-lg'} font-black leading-none ${tone}`}>{cornerLabel}</div>
             <div className={`text-sm leading-none ${tone}`}>{suitIcon}</div>
           </div>
         </div>
 
-        <div className={`self-center text-5xl leading-none ${tone}`}>{suitIcon}</div>
+        <div className={`self-center px-1 text-center font-black leading-tight ${tone} ${isCustomCard ? 'text-sm' : 'text-5xl'}`}>
+          {centerLabel}
+          {isCustomCard && subLabel && (
+            <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">{subLabel}</div>
+          )}
+        </div>
 
         <div className="flex items-end justify-end">
           <div className="flex flex-col items-end">
-            <div className={`text-lg font-black leading-none rotate-180 ${tone}`}>{card.rank}</div>
+            <div className={`${isCustomCard ? 'max-w-[4.25rem] truncate text-[10px]' : 'text-lg'} font-black leading-none rotate-180 ${tone}`}>{cornerLabel}</div>
             <div className={`text-sm leading-none rotate-180 ${tone}`}>{suitIcon}</div>
           </div>
         </div>
@@ -850,6 +878,9 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
   const renderPlayStackCard = (card: Card) => {
     const tone = cardTone(card);
     const suitIcon = SUIT_SYMBOLS[card.suit];
+    const cornerLabel = getCardCornerLabel(card);
+    const centerLabel = getCardCenterLabel(card);
+    const isCustomCard = Boolean(card.title);
 
     return (
       <div
@@ -859,13 +890,16 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
       >
         <div className="flex items-start">
           <div className="flex flex-col items-start">
-            <div className={`text-xs font-black leading-none ${tone}`}>{card.rank}</div>
+            <div className={`max-w-12 truncate text-xs font-black leading-none ${tone}`}>{cornerLabel}</div>
             <div className={`text-[9px] leading-none ${tone}`}>{suitIcon}</div>
           </div>
         </div>
+        {isCustomCard && (
+          <div className={`px-1 text-center text-[10px] font-black leading-tight ${tone}`}>{centerLabel}</div>
+        )}
         <div className="flex items-end justify-end">
           <div className="flex flex-col items-end">
-            <div className={`text-xs font-black leading-none rotate-180 ${tone}`}>{card.rank}</div>
+            <div className={`max-w-12 truncate text-xs font-black leading-none rotate-180 ${tone}`}>{cornerLabel}</div>
             <div className={`text-[9px] leading-none rotate-180 ${tone}`}>{suitIcon}</div>
           </div>
         </div>
@@ -1001,6 +1035,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
                   key={i}
                   type="button"
                   onClick={() => {
+                    if (!isPreview && !activeGameSettings.allowDrawFromOthers) return;
                     if (navigator.vibrate) navigator.vibrate(15);
                     playDrawSound();
 
@@ -1123,7 +1158,8 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
                     setViewOther(targetActionPlayer.id);
                     setTargetActionPlayerId(null);
                   }}
-                  className="rounded-xl border border-sky-300/20 bg-sky-400/15 px-4 py-3 text-sm font-black text-sky-100 active:scale-[0.98] transition-all"
+                  disabled={!isPreview && !activeGameSettings.allowDrawFromOthers}
+                  className="rounded-xl border border-sky-300/20 bg-sky-400/15 px-4 py-3 text-sm font-black text-sky-100 active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100"
                 >
                   {t(locale, dict, 'client.requestDrawFromPlayer')}
                 </button>
@@ -1162,7 +1198,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
               </div>
               {(isPreview
                 ? previewUndoCount > 0
-                : undoableActionCount > 0) && (
+                : activeGameSettings.allowPlayerUndo && undoableActionCount > 0) && (
                 <button
                   onClick={() => setShowUndoConfirm(true)}
                   className="rounded-full border border-amber-300/20 bg-amber-400/15 px-3 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-amber-200 active:scale-[0.95] transition-all whitespace-nowrap"
@@ -1206,7 +1242,7 @@ export function ConnectedClient({ hostId, playerName, isPreview }: { hostId: str
                   )}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {totalStackCards > 0 && (
+                  {totalStackCards > 0 && (isPreview || activeGameSettings.allowClientClearTable) && (
                     <button
                       onClick={() => {
                         if (isPreview) {

@@ -7,6 +7,8 @@ import { playShuffleSound } from '../utils/audio/shuffle';
 import { useLocale, t } from '../i18n/LocaleProvider';
 import type { Locale } from '../i18n/LocaleProvider';
 import dict from '../i18n/translations';
+import type { DeckPresetId } from '../types';
+import { DECK_PRESETS, getGamePackIdForDeckPreset } from '../config/tableConfig';
 
 type DangerAction = 'clear' | 'reset';
 
@@ -27,6 +29,8 @@ export default function PhoneHost() {
     resetGame,
     clearTableToDiscard,
     dealCardsToPlayer,
+    dealOpeningHands,
+    updateGameSettings,
     assignSeat,
     removeOfflinePlayer,
     approvePendingAction,
@@ -49,6 +53,7 @@ export default function PhoneHost() {
   const activeHostPendingAction = hostPendingActions[0];
   const playStackCount = gameState.playStack.flat().length;
   const selectedSeatPlayer = seatPlayerId ? gameState.players[seatPlayerId] : undefined;
+  const gameSettings = gameState.gameSettings;
 
   const seatLabel = (seatId?: string) => {
     if (!seatId) return t(locale, dict, 'host.unseated');
@@ -242,6 +247,73 @@ export default function PhoneHost() {
                 >
                   {t(locale, dict, 'host.resetShuffle')}
                 </button>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                <div className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/45">{t(locale, dict, 'host.gameSettings')}</div>
+                <div className="grid gap-2">
+                  <select
+                    value={gameSettings.deckPresetId}
+                    onChange={(e) => {
+                      const deckPresetId = e.target.value as DeckPresetId;
+                      updateGameSettings({
+                        deckPresetId,
+                        gamePackId: getGamePackIdForDeckPreset(deckPresetId),
+                      });
+                    }}
+                    className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs font-black text-white outline-none"
+                  >
+                    {Object.values(DECK_PRESETS).map(preset => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.name} · {preset.cardCount}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={gameSettings.startingHandCount}
+                      onChange={(e) => updateGameSettings({ startingHandCount: Math.max(0, Math.min(20, Number(e.target.value) || 0)) })}
+                      className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs font-black text-white outline-none"
+                      aria-label={t(locale, dict, 'host.startingHand')}
+                    />
+                    <button
+                      onClick={dealOpeningHands}
+                      disabled={gameSettings.startingHandCount <= 0 || Object.keys(gameState.players).length === 0 || gameState.deckCount === 0}
+                      className="rounded-xl border border-emerald-300/20 bg-emerald-400/15 px-3 py-2 text-xs font-black text-emerald-100 disabled:opacity-35"
+                    >
+                      {t(locale, dict, 'host.dealOpeningHands', { n: String(gameSettings.startingHandCount) })}
+                    </button>
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs font-black text-white/70">
+                      <span>{t(locale, dict, 'host.allowSteal')}</span>
+                      <input
+                        type="checkbox"
+                        checked={gameSettings.allowDrawFromOthers}
+                        onChange={(e) => updateGameSettings({ allowDrawFromOthers: e.target.checked })}
+                      />
+                    </label>
+                    <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs font-black text-white/70">
+                      <span>{t(locale, dict, 'host.allowUndo')}</span>
+                      <input
+                        type="checkbox"
+                        checked={gameSettings.allowPlayerUndo}
+                        onChange={(e) => updateGameSettings({ allowPlayerUndo: e.target.checked })}
+                      />
+                    </label>
+                    <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs font-black text-white/70">
+                      <span>{t(locale, dict, 'host.allowClientClear')}</span>
+                      <input
+                        type="checkbox"
+                        checked={gameSettings.allowClientClearTable}
+                        onChange={(e) => updateGameSettings({ allowClientClearTable: e.target.checked })}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
 
               {Object.values(gameState.players).length > 0 && (

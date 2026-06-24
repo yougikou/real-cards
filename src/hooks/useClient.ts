@@ -12,6 +12,7 @@ function getUndoConfirmation(move: MoveLedgerEntry) {
 }
 
 function countUndoableMoves(state: GameState, playerName: string) {
+  if (!state.gameSettings.allowPlayerUndo) return 0;
   return state.moveLedger.filter(move => (
     !move.undone &&
     !move.undoOf &&

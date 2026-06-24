@@ -8,6 +8,8 @@ import { playShuffleSound } from '../utils/audio/shuffle';
 import { useLocale, t } from '../i18n/LocaleProvider';
 import dict from '../i18n/translations';
 import type { Locale } from '../i18n/LocaleProvider';
+import type { DeckPresetId } from '../types';
+import { DECK_PRESETS, getGamePackIdForDeckPreset } from '../config/tableConfig';
 import { emitTableSnapshot, onHostCommand } from '../bridge/tableBridge';
 
 const STATUS_STYLES: Record<string, { panel: string; dot: string }> = {
@@ -68,6 +70,8 @@ function DesktopHost() {
     gameState,
     resetGame,
     clearTableToDiscard,
+    dealOpeningHands,
+    updateGameSettings,
     assignSeat,
     removeOfflinePlayer,
     approvePendingAction,
@@ -88,6 +92,7 @@ function DesktopHost() {
   const [dangerAction, setDangerAction] = useState<DangerAction | null>(null);
   const hostPendingActions = Object.values(gameState.pendingActions).filter(action => action.confirmationMode === 'host');
   const activeHostPendingAction = hostPendingActions[0];
+  const gameSettings = gameState.gameSettings;
 
   const statusLabel =
     status === 'ready' ? t(locale, dict, 'host.statusReady') :
@@ -305,6 +310,80 @@ function DesktopHost() {
                     {status === 'failed' && error ? error : t(locale, dict, 'host.helper')}
                   </div>
 
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">{t(locale, dict, 'host.gameSettings')}</div>
+                      <div className="text-[10px] font-semibold text-white/35">{t(locale, dict, 'host.appliesOnReset')}</div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                        {t(locale, dict, 'host.deckPreset')}
+                        <select
+                          value={gameSettings.deckPresetId}
+                          onChange={(e) => {
+                            const deckPresetId = e.target.value as DeckPresetId;
+                            updateGameSettings({
+                              deckPresetId,
+                              gamePackId: getGamePackIdForDeckPreset(deckPresetId),
+                            });
+                          }}
+                          className="rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-xs font-black normal-case tracking-normal text-white outline-none"
+                        >
+                          {Object.values(DECK_PRESETS).map(preset => (
+                            <option key={preset.id} value={preset.id}>
+                              {preset.name} · {preset.cardCount}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                        {t(locale, dict, 'host.startingHand')}
+                        <input
+                          type="number"
+                          min={0}
+                          max={20}
+                          value={gameSettings.startingHandCount}
+                          onChange={(e) => updateGameSettings({ startingHandCount: Math.max(0, Math.min(20, Number(e.target.value) || 0)) })}
+                          className="rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-xs font-black normal-case tracking-normal text-white outline-none"
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                      <label className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-xs font-bold text-white/80">
+                        <span>{t(locale, dict, 'host.allowSteal')}</span>
+                        <input
+                          type="checkbox"
+                          checked={gameSettings.allowDrawFromOthers}
+                          onChange={(e) => updateGameSettings({ allowDrawFromOthers: e.target.checked })}
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-xs font-bold text-white/80">
+                        <span>{t(locale, dict, 'host.allowUndo')}</span>
+                        <input
+                          type="checkbox"
+                          checked={gameSettings.allowPlayerUndo}
+                          onChange={(e) => updateGameSettings({ allowPlayerUndo: e.target.checked })}
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-xs font-bold text-white/80">
+                        <span>{t(locale, dict, 'host.allowClientClear')}</span>
+                        <input
+                          type="checkbox"
+                          checked={gameSettings.allowClientClearTable}
+                          onChange={(e) => updateGameSettings({ allowClientClearTable: e.target.checked })}
+                        />
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={dealOpeningHands}
+                      disabled={gameSettings.startingHandCount <= 0 || playerCount === 0 || gameState.deckCount === 0}
+                      className="mt-2 w-full rounded-lg border border-emerald-300/20 bg-emerald-400/15 px-3 py-2 text-xs font-black text-emerald-100 transition-all active:scale-[0.98] disabled:opacity-35"
+                    >
+                      {t(locale, dict, 'host.dealOpeningHands', { n: String(gameSettings.startingHandCount) })}
+                    </button>
+                  </div>
+
                   {playerCount > 0 && (
                     <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                       <div className="mb-2 flex items-center justify-between gap-3">
@@ -384,8 +463,8 @@ function DesktopHost() {
                           <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">{t(locale, dict, 'host.ledgerTimeline')}</div>
                           <div className="grid max-h-32 gap-1 overflow-y-auto pr-1">
                             {gameState.moveLedger.slice(-6).reverse().map(move => (
-                              <div key={move.id} className="truncate rounded-lg bg-white/[0.04] px-2 py-1.5 font-mono text-[10px] text-white/65">
-                                {moveText(move)}
+                              <div key={move.id} className="truncate rounded-lg bg-white/[0.04] px-2 py-1.5 font-mono text-[10px] text-white/65" title={move.cardIds.join(', ')}>
+                                #{move.seq} · {moveText(move)}
                               </div>
                             ))}
                           </div>
