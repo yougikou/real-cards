@@ -1,10 +1,28 @@
 export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades' | 'none';
-export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'JOKER';
+export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'JOKER' | 'CUSTOM';
+export type CardCategory = 'standard' | 'joker' | 'basic' | 'tactic' | 'equipment' | 'role' | 'character' | 'custom';
 
 export interface Card {
   id: string; // unique identifier
   suit: Suit;
   rank: Rank;
+  packId?: string;
+  faceId?: string;
+  title?: string;
+  category?: CardCategory;
+  tags?: string[];
+}
+
+export type DeckPresetId = 'standard-52' | 'standard-54' | 'hero-duel-prototype';
+
+export interface GameSettings {
+  gamePackId: string;
+  deckPresetId: DeckPresetId;
+  startingHandCount: number;
+  allowDrawFromOthers: boolean;
+  allowClientClearTable: boolean;
+  revealCardFacesInEvents: boolean;
+  allowPlayerUndo: boolean;
 }
 
 export interface Player {
@@ -55,6 +73,7 @@ export type ConfirmationMode = 'none' | 'host' | 'counterparty' | 'locked';
 
 export interface MoveLedgerEntry {
   id: string;
+  seq: number;
   batchId?: string;
   timestamp: number;
   action: GameEventType;
@@ -70,6 +89,8 @@ export interface MoveLedgerEntry {
   from: CardContainer;
   to: CardContainer;
   cards: Card[];
+  cardIds: string[];
+  replayable: boolean;
   reversible?: boolean;
   undone?: boolean;
   undoOf?: string;
@@ -84,7 +105,7 @@ export interface PendingAction {
   counterpartyPlayerId?: string;
   counterpartyName?: string;
   confirmationMode: Exclude<ConfirmationMode, 'none' | 'locked'>;
-  move?: Omit<MoveLedgerEntry, 'id' | 'timestamp'>;
+  move?: Omit<MoveLedgerEntry, 'id' | 'timestamp' | 'seq' | 'cardIds' | 'replayable'>;
   undoMoveId?: string;
   cardId?: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -92,6 +113,7 @@ export interface PendingAction {
 }
 
 export interface GameState {
+  gameSettings: GameSettings;
   deckCount: number;
   discardPile: Card[];
   playStack: Card[][]; // Stack of played batches

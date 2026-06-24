@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import Peer, { type DataConnection } from 'peerjs';
-import type { Card, ConfirmationMode, GameState, ClientAction, HostMessage, MoveLedgerEntry, PendingAction } from '../types';
+import type { Card, ConfirmationMode, GameSettings, GameState, ClientAction, HostMessage, MoveLedgerEntry, PendingAction } from '../types';
 import { createDeck } from '../utils/deck';
+import { DEFAULT_GAME_SETTINGS } from '../config/tableConfig';
 import { emitTableSnapshot, onHostCommand } from '../bridge/tableBridge';
 import {
   addCardsToHand,
@@ -60,13 +61,17 @@ function findNextOpenSeat(state: GameState): string | undefined {
 
 function appendMove(
   state: GameState,
-  move: Omit<MoveLedgerEntry, 'id' | 'timestamp'> & { timestamp?: number },
+  move: Omit<MoveLedgerEntry, 'id' | 'timestamp' | 'seq' | 'cardIds' | 'replayable'> & { timestamp?: number },
 ): GameState {
   const timestamp = move.timestamp ?? Date.now();
+  const lastSeq = state.moveLedger[state.moveLedger.length - 1]?.seq ?? 0;
   const entry: MoveLedgerEntry = {
     ...move,
     id: `${timestamp}-${state.moveLedger.length}-${move.action}`,
+    seq: lastSeq + 1,
     timestamp,
+    cardIds: move.cards.map(card => card.id),
+    replayable: move.reversible !== false,
     reversible: move.reversible ?? true,
   };
   const moveLedger = [...state.moveLedger, entry];
@@ -124,7 +129,7 @@ function removePendingAction(state: GameState, pendingActionId: string): GameSta
 
 function appendMoveAndEvent(
   state: GameState,
-  move: Omit<MoveLedgerEntry, 'id' | 'timestamp'>,
+  move: Omit<MoveLedgerEntry, 'id' | 'timestamp' | 'seq' | 'cardIds' | 'replayable'>,
   event: Parameters<typeof appendEvent>[1],
 ): GameState {
   return appendEvent(appendMove(state, { ...move, timestamp: event.timestamp }), event);
@@ -141,6 +146,7 @@ export function useHost() {
   const [peerId, setPeerId] = useState<string>('');
 
   const [gameState, setGameState] = useState<GameState>({
+    gameSettings: DEFAULT_GAME_SETTINGS,
     deckCount: 54,
     discardPile: [],
     playStack: [],
@@ -163,7 +169,10 @@ export function useHost() {
   const connectionsRef = useRef<Record<string, DataConnection>>({});
 
   const resetGame = () => {
-    const removedCardIdsByPlayer = resetServerCards(serverStateRef.current, createDeck());
+    const removedCardIdsByPlayer = resetServerCards(
+      serverStateRef.current,
+      createDeck(gameStateRef.current.gameSettings.deckPresetId),
+    );
 
     for (const [clientId, cardIds] of Object.entries(removedCardIdsByPlayer)) {
       if (cardIds.length > 0) {
@@ -181,7 +190,7 @@ export function useHost() {
 
   // Keep true deck and hands server-side
   const serverStateRef = useRef({
-    deck: createDeck(),
+    deck: createDeck(DEFAULT_GAME_SETTINGS.deckPresetId),
     playerHands: {} as Record<string, Card[]>,
   });
 
@@ -250,6 +259,24 @@ export function useHost() {
       },
       { timestamp: Date.now(), type: 'HOST_DEAL' as const, playerName: prev.players[playerId]?.name, cards },
     ));
+  };
+
+  const dealOpeningHands = () => {
+    const count = gameStateRef.current.gameSettings.startingHandCount;
+    if (count <= 0) return;
+    for (const playerId of Object.keys(gameStateRef.current.players)) {
+      dealCardsToPlayer(playerId, count);
+    }
+  };
+
+  const updateGameSettings = (patch: Partial<GameSettings>) => {
+    updateStateAndBroadcast(prev => ({
+      ...prev,
+      gameSettings: {
+        ...prev.gameSettings,
+        ...patch,
+      },
+    }));
   };
 
   const assignSeat = (playerId: string, seatId?: string) => {
@@ -702,6 +729,7 @@ export function useHost() {
         break;
       }
       case 'DRAW_FROM_OTHER': {
+        if (!gameStateRef.current.gameSettings.allowDrawFromOthers) break;
         const { targetPlayerId, cardId } = action.payload;
         const requester = gameStateRef.current.players[clientId];
         const target = gameStateRef.current.players[targetPlayerId];
@@ -771,6 +799,7 @@ export function useHost() {
         break;
       }
       case 'CLEAR_TABLE': {
+        if (!gameStateRef.current.gameSettings.allowClientClearTable) break;
         clearTableToDiscard();
         break;
       }
@@ -792,6 +821,7 @@ export function useHost() {
         break;
       }
       case 'UNDO_LAST_ACTION': {
+        if (!gameStateRef.current.gameSettings.allowPlayerUndo) break;
         requestUndoForPlayer(clientId);
         break;
       }
@@ -1063,6 +1093,8 @@ export function useHost() {
     resetGame,
     clearTableToDiscard,
     dealCardsToPlayer,
+    dealOpeningHands,
+    updateGameSettings,
     assignSeat,
     removeOfflinePlayer,
     approvePendingAction,

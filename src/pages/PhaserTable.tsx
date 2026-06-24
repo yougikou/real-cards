@@ -26,6 +26,8 @@ function pt(locale: Locale, key: string, vars?: Record<string, string>): string 
 
 let _initialDeckCount = 0;
 
+type TableCardData = Pick<Card, 'id' | 'rank' | 'suit' | 'title' | 'category' | 'tags' | 'faceId'>;
+
 interface PlayerZone {
   rect: Phaser.GameObjects.Rectangle;
   text?: Phaser.GameObjects.Text;
@@ -69,8 +71,8 @@ class TableScene extends Phaser.Scene {
   private locale: Locale = 'en';
 
   // Play stack multi-select + drag state
-  private selectedPlayStackCards: { rank: string; suit: string; id: string }[] = [];
-  private pendingDragCard: { cardData: { rank: string; suit: string; id: string }; imgX: number; imgY: number } | null = null;
+  private selectedPlayStackCards: TableCardData[] = [];
+  private pendingDragCard: { cardData: TableCardData; imgX: number; imgY: number } | null = null;
   private pendingDragStartPos: { x: number; y: number } | null = null;
   private pendingDragPointerId: number | null = null;
 
@@ -183,7 +185,7 @@ class TableScene extends Phaser.Scene {
           this.discardCountText.setVisible(count > 0);
         }
         if (count > 0 && topCard) {
-          const texKey = this.generateCardFaceTexture(topCard.rank, topCard.suit);
+          const texKey = this.generateCardFaceTexture(topCard);
           for (const s of this.discardSprites) {
             s.setTexture(texKey);
           }
@@ -602,7 +604,7 @@ class TableScene extends Phaser.Scene {
     this.playStackEmptyText?.setVisible(false);
     this.playStackSubText?.setVisible(false);
 
-    const allCards = playStack.flat() as { rank: string; suit: string; id: string }[];
+    const allCards = playStack.flat() as TableCardData[];
     const totalCards = allCards.length;
 
     if (this.playStackCountText) {
@@ -624,7 +626,7 @@ class TableScene extends Phaser.Scene {
     for (let i = 0; i < totalCards; i++) {
       const cardData = allCards[i];
       const x = startX + i * overlap;
-      const texKey = this.generateCardFaceTexture(cardData.rank, cardData.suit);
+      const texKey = this.generateCardFaceTexture(cardData);
       const img = this.add.image(x, baseY, texKey);
       img.setScale(cardScale).setDepth(i);
       Object.assign(img, { cardData });
@@ -681,7 +683,7 @@ class TableScene extends Phaser.Scene {
     const startY = this.pendingDragCard.imgY;
 
     // Collect all cards to drag: clicked card + any selected cards
-    const cardSet = new Map<string, { rank: string; suit: string; id: string }>();
+    const cardSet = new Map<string, TableCardData>();
     cardSet.set(clickedCard.id, clickedCard);
     for (const sel of this.selectedPlayStackCards) {
       if (!cardSet.has(sel.id)) cardSet.set(sel.id, sel);
@@ -689,7 +691,7 @@ class TableScene extends Phaser.Scene {
     this.selectedPlayStackCards = [];
 
     // Create Matter drag body BEFORE dispatching state removes
-    const texKey = this.generateCardFaceTexture(clickedCard.rank, clickedCard.suit);
+    const texKey = this.generateCardFaceTexture(clickedCard);
     const newCard = this.matter.add.image(startX, startY, texKey, undefined, {
         mass: 0.35, friction: 0.18, frictionAir: 0.2, restitution: 0.05
     });
@@ -706,7 +708,7 @@ class TableScene extends Phaser.Scene {
     const extraCards = Array.from(cardSet.values()).filter(c => c.id !== clickedCard.id);
     this.dragExtraImages = [];
     for (let i = 0; i < Math.min(extraCards.length, 3); i++) {
-      const eTex = this.generateCardFaceTexture(extraCards[i].rank, extraCards[i].suit);
+      const eTex = this.generateCardFaceTexture(extraCards[i]);
       const ei = this.add.image(startX + (i + 1) * 8, startY + (i + 1) * -6, eTex);
       ei.setScale(1.0 - i * 0.02).setDepth(99 - i).setAlpha(0.86 - i * 0.1);
       this.dragExtraImages.push(ei);
@@ -729,7 +731,7 @@ class TableScene extends Phaser.Scene {
     this.updateZoneLabels();
   }
 
-  private togglePlayStackSelection(cardData: { rank: string; suit: string; id: string }) {
+  private togglePlayStackSelection(cardData: TableCardData) {
     const idx = this.selectedPlayStackCards.findIndex(c => c.id === cardData.id);
     if (idx >= 0) {
       this.selectedPlayStackCards.splice(idx, 1);
@@ -751,8 +753,11 @@ class TableScene extends Phaser.Scene {
     }
   }
 
-  private generateCardFaceTexture(rank: string, suit: string): string {
-    const key = `cface_${rank}_${suit}`;
+  private generateCardFaceTexture(cardData: Pick<Card, 'rank' | 'suit' | 'title' | 'category' | 'tags' | 'faceId'>): string {
+    const rank = cardData.rank;
+    const suit = cardData.suit;
+    const title = cardData.title;
+    const key = `cface_${cardData.faceId ?? `${rank}_${suit}`}`;
     if (this.textures.exists(key)) return key;
 
     const pad = 4;
@@ -793,25 +798,33 @@ class TableScene extends Phaser.Scene {
     const sym = suitSymbols[suit] || '?';
 
     ctx.fillStyle = color;
-    ctx.font = 'bold 20px Arial, sans-serif';
+    const cornerLabel = title && cardData.category ? cardData.category.slice(0, 4).toUpperCase() : rank;
+    const centerLabel = title ?? sym;
+    const subLabel = title ? cardData.tags?.slice(0, 2).join(' / ') ?? '' : '';
+
+    ctx.font = title ? 'bold 11px Arial, sans-serif' : 'bold 20px Arial, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(rank, pad + 6, pad + 6);
+    ctx.fillText(cornerLabel, pad + 6, pad + 6, 72);
     ctx.font = '14px Arial, sans-serif';
     ctx.fillText(sym, pad + 6, pad + 28);
 
-    ctx.font = '48px Arial, sans-serif';
+    ctx.font = title ? 'bold 16px Arial, sans-serif' : '48px Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(sym, cw / 2, ch / 2 + 5);
+    ctx.fillText(centerLabel, cw / 2, ch / 2, 78);
+    if (subLabel) {
+      ctx.font = '9px Arial, sans-serif';
+      ctx.fillText(subLabel.toUpperCase(), cw / 2, ch / 2 + 20, 78);
+    }
 
     ctx.save();
     ctx.translate(pad + 94, pad + 134);
     ctx.rotate(Math.PI);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.font = 'bold 20px Arial, sans-serif';
-    ctx.fillText(rank, 0, 0);
+    ctx.font = title ? 'bold 11px Arial, sans-serif' : 'bold 20px Arial, sans-serif';
+    ctx.fillText(cornerLabel, 0, 0, 72);
     ctx.font = '14px Arial, sans-serif';
     ctx.fillText(sym, 0, 22);
     ctx.restore();
@@ -914,8 +927,8 @@ class TableScene extends Phaser.Scene {
   }
 
   private releaseCard(card: Phaser.Physics.Matter.Image) {
-    const draggedCards = (card as unknown as { draggedCards?: { rank: string; suit: string; id: string }[] }).draggedCards;
-    const allCardData = draggedCards ?? ([(card as unknown as { cardData?: { rank: string; suit: string; id: string } }).cardData].filter(Boolean) as { rank: string; suit: string; id: string }[]);
+    const draggedCards = (card as unknown as { draggedCards?: TableCardData[] }).draggedCards;
+    const allCardData = draggedCards ?? ([(card as unknown as { cardData?: TableCardData }).cardData].filter(Boolean) as TableCardData[]);
     if (allCardData.length === 0) { card.destroy(); return; }
 
     let targetZone: PlayerZone | null = null;
